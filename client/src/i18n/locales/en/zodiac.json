@@ -1,0 +1,21 @@
+{
+  "title": "⭐ Zodiac Fortune",
+  "subtitle": "Explore the mystical power of 12 zodiac signs",
+  "selectSign": "Select Sign",
+  "overall": "Overall Fortune",
+  "love": "Love Fortune",
+  "career": "Career Fortune",
+  "wealth": "Wealth Fortune",
+  "health": "Health Fortune",
+  "luckyNumber": "Lucky Number",
+  "luckyColor": "Lucky Color",
+  "luckyDirection": "Lucky Direction",
+  "compatibility": "Compatibility",
+  "aiAnalysis": "AI Analysis",
+  "saveRecord": "Save Record",
+  "todayFortune": "{name} Today's Fortune",
+  "overallLabel": "Overall Fortune",
+  "elementLabel": "Zodiac Element",
+  "luckyGuide": "💡 Today's Advice",
+  "readingStars": "Reading the stars..."
+}

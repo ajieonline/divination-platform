@@ -1,0 +1,149 @@
+{
+  "vipCenter": "VIP Membership Center",
+  "loginPrompt": "Login to earn points",
+  "checkinSuccess": "Check-in success! +{{points}} pts",
+  "alreadyCheckedIn": "Already checked in today",
+  "checkinFailed": "Check-in failed, please retry",
+  "networkError": "Network error, please check connection",
+  "insufficientPoints": "Not enough points, keep checking in!",
+  "redeemSuccess": "Redeemed successfully!",
+  "redeemFailed": "Redemption failed",
+  "heroTitle": "Unlock the",
+  "heroHighlight": "Unlimited Potential",
+  "heroSubtitle": "100+ Professional Divination · Deep AI Analysis · Exclusive VIP Privileges",
+  "statMethods": "Methods",
+  "statUsers": "Users Trust Us",
+  "statRate": "Satisfaction",
+  "registerFree": "Register Free, Start Now",
+  "tabPlans": "Plans",
+  "tabCompare": "Free vs VIP",
+  "tabPoints": "Points",
+  "tabReviews": "Reviews",
+  "bestValue": "Most Popular",
+  "perDay": "Only",
+  "activateNow": "Activate Now",
+  "loginToActivate": "Login to Activate",
+  "myPoints": "My Points",
+  "processing": "Processing...",
+  "todayCheckedIn": "Checked In Today",
+  "dailyCheckin": "Daily Check-in +10pts",
+  "loginToEarnPoints": "Login to check in and earn points",
+  "loginOrRegister": "Login / Register",
+  "earnTitle": "How to Earn Points",
+  "pointsUnit": "pts",
+  "verifiedVip": "Verified VIP",
+  "planNames": {
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "yearly": "Yearly"
+  },
+  "features": {
+    "unlimited": "All 100+ divinations unlimited",
+    "deepReport": "Exclusive deep analysis report",
+    "cloudHistory": "Cloud history storage",
+    "doublePoints": "Double check-in points",
+    "monthlyAll": "All Monthly benefits",
+    "vipConsult": "VIP 1-on-1 consultation",
+    "birthdayFree": "3 free divinations on birthday month",
+    "priorityAccess": "Priority access to new features",
+    "quarterlyAll": "All Quarterly benefits",
+    "freeSalon": "Free online divination salon",
+    "customReport": "Custom personal fortune report",
+    "vipSupport": "Dedicated VIP support"
+  },
+  "compareHeaders": {
+    "feature": "Feature",
+    "free": "Free"
+  },
+  "compareFeatures": [
+    {
+      "feature": "Daily Fortune",
+      "free": "Basic overview",
+      "vip": "Detailed analysis + lucky guide"
+    },
+    {
+      "feature": "Tarot Reading",
+      "free": "1 card/day",
+      "vip": "All spreads unlimited"
+    },
+    {
+      "feature": "BaZi Fortune",
+      "free": "Basic chart",
+      "vip": "Deep analysis + yearly"
+    },
+    {
+      "feature": "AI Dream",
+      "free": "Simple meaning",
+      "vip": "Psychological deep reading"
+    },
+    {
+      "feature": "Name Test",
+      "free": "Stroke fortune",
+      "vip": "Full five-grid analysis"
+    },
+    {
+      "feature": "History",
+      "free": "Last 5 only",
+      "vip": "Unlimited"
+    }
+  ],
+  "earnMethods": [
+    {
+      "action": "Daily check-in",
+      "points": "+10"
+    },
+    {
+      "action": "Share result",
+      "points": "+20"
+    },
+    {
+      "action": "Invite friend",
+      "points": "+100"
+    },
+    {
+      "action": "First divination",
+      "points": "+50"
+    }
+  ],
+  "redeemItems": [
+    {
+      "icon": "🎯",
+      "name": "Single Tarot",
+      "cost": 500,
+      "desc": "One three-card spread reading"
+    },
+    {
+      "icon": "📊",
+      "name": "BaZi Deep",
+      "cost": 800,
+      "desc": "One BaZi deep analysis"
+    },
+    {
+      "icon": "💎",
+      "name": "VIP Monthly",
+      "cost": 2000,
+      "desc": "30-day VIP membership"
+    },
+    {
+      "icon": "🎁",
+      "name": "Fortune Report",
+      "cost": 300,
+      "desc": "Detailed personal fortune report"
+    }
+  ],
+  "reviews": {
+    "xiaoyu": {
+      "name": "Xiaoyu",
+      "text": "Used the three-card spread for three months, every reading was accurate, especially the relationship guidance."
+    },
+    "xingchen": {
+      "name": "Xingchen",
+      "text": "BaZi deep analysis helped me understand my strengths and made the right career choice."
+    },
+    "nuannuan": {
+      "name": "Nuannuan",
+      "text": "Yearly plan is so worth it! AI dream interpretation is fun, daily fortune has become a habit."
+    }
+  },
+  "comingSoon": "Payment feature coming soon!"
+}

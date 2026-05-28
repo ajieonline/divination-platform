@@ -1,0 +1,32 @@
+{
+  "siteName": "天机算命",
+  "nav": {
+    "home": "首页",
+    "tarot": "塔罗占卜",
+    "zodiac": "星座运势",
+    "daily": "每日运势",
+    "bazi": "八字命理",
+    "iching": "易经卜卦",
+    "name": "姓名测试",
+    "sign": "抽签",
+    "dream": "AI解梦",
+    "vip": "VIP会员",
+    "more": "更多",
+    "login": "登录",
+    "logout": "退出"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "出错了",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "back": "返回",
+    "retry": "重试",
+    "aiAnalysis": "AI深度解读"
+  }
+}

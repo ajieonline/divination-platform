@@ -1,0 +1,32 @@
+{
+  "siteName": "MysticDivine",
+  "nav": {
+    "home": "Home",
+    "tarot": "Tarot",
+    "zodiac": "Horoscope",
+    "daily": "Daily Fortune",
+    "bazi": "BaZi",
+    "iching": "I Ching",
+    "name": "Name Test",
+    "sign": "Lot Draw",
+    "dream": "Dream",
+    "vip": "VIP",
+    "more": "More",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "retry": "Retry",
+    "aiAnalysis": "AI Deep Analysis"
+  }
+}

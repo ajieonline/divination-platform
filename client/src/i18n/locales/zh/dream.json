@@ -1,0 +1,30 @@
+{
+  "title": "💤 AI智能解梦",
+  "subtitle": "输入梦境关键词，AI为你解读梦境含义",
+  "inputPlaceholder": "例如：梦见飞翔、梦见蛇、梦见考试...",
+  "interpretBtn": "🔮 开始解梦",
+  "interpreting": "🔮 解梦中...",
+  "dreamAnalysis": "梦境解析",
+  "symbolAnalysis": "梦境符号",
+  "emotionalAnalysis": "情感分析",
+  "suggestion": "建议",
+  "aiAnalysis": "🤖 AI深度解读",
+  "saveRecord": "保存记录",
+  "newDream": "解另一个梦",
+  "categoryLabel": "梦境分类",
+  "categoryPlaceholder": "选择梦境类型",
+  "quickKeywords": "选择关键词，或手动输入",
+  "inputPlaceholder2": "或手动输入梦境关键词...",
+  "dreamKeyword": "梦境关键词：{keyword}",
+  "analyzing": "🔮 解析中...",
+  "startInterpret": "💭 解梦",
+  "error": "请输入或选择梦境关键词",
+  "categories": {
+    "nature": "自然现象",
+    "animals": "动物",
+    "body": "身体",
+    "life": "生活",
+    "objects": "物品",
+    "people": "人物"
+  }
+}

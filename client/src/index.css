@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0a0014;
+  --bg-secondary: #1a0a2e;
+  --bg-card: rgba(30, 15, 60, 0.8);
+  --text-primary: #f5f0ff;
+  --text-secondary: #c4b5fd;
+  --accent-purple: #d946ef;
+  --accent-gold: #fbbf24;
+  --border-glow: rgba(217, 70, 239, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Noto Serif SC', serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(120, 0, 160, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(217, 70, 239, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(251, 191, 36, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+.star {
+  position: fixed;
+  width: 2px;
+  height: 2px;
+  background: white;
+  border-radius: 50%;
+  animation: twinkle var(--duration, 3s) ease-in-out infinite;
+  opacity: 0.3;
+  z-index: 0;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.card-glass {
+  background: rgba(30, 15, 60, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(217, 70, 239, 0.2);
+  border-radius: 1rem;
+}
+
+.btn-mystic {
+  background: linear-gradient(135deg, #a21caf, #7c3aed);
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(162, 28, 175, 0.4);
+}
+
+.btn-mystic:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(162, 28, 175, 0.6);
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #1a0a2e;
+  padding: 0.75rem 2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.6);
+}
+
+.input-mystic {
+  background: rgba(30, 15, 60, 0.8);
+  border: 1px solid rgba(217, 70, 239, 0.3);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: white;
+  font-size: 1rem;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.3s;
+}
+
+.input-mystic:focus {
+  border-color: #d946ef;
+  box-shadow: 0 0 10px rgba(217, 70, 239, 0.3);
+}
+
+.input-mystic::placeholder {
+  color: rgba(196, 181, 253, 0.5);
+}
+
+.input-mystic option {
+  background: #1a0a2e;
+  color: white;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes particleFloat {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+}
+
+.particle {
+  position: fixed;
+  width: 4px;
+  height: 4px;
+  background: var(--accent-gold);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particleFloat linear infinite;
+  z-index: 0;
+}
+
+/* Loading Spinner Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.4); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.loading-spin {
+  animation: spin 2s linear infinite;
+}
+
+.loading-pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.loading-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.loading-fade {
+  animation: fadeInOut 2s ease-in-out infinite;
+}

@@ -1,0 +1,30 @@
+{
+  "title": "💤 AI Dream Interpretation",
+  "subtitle": "Enter dream keywords, AI interprets dream meanings",
+  "inputPlaceholder": "e.g.: flying, snake, exam...",
+  "interpretBtn": "🔮 Interpret Dream",
+  "interpreting": "🔮 Interpreting...",
+  "dreamAnalysis": "Dream Analysis",
+  "symbolAnalysis": "Symbol Analysis",
+  "emotionalAnalysis": "Emotional Analysis",
+  "suggestion": "Suggestion",
+  "aiAnalysis": "🤖 AI Deep Interpretation",
+  "saveRecord": "Save Record",
+  "newDream": "Interpret Another Dream",
+  "categoryLabel": "Dream Category",
+  "categoryPlaceholder": "Select dream type",
+  "quickKeywords": "Choose keywords, or type your own",
+  "inputPlaceholder2": "Or type dream keywords...",
+  "dreamKeyword": "Dream keyword: {keyword}",
+  "analyzing": "🔮 Interpreting...",
+  "startInterpret": "💭 Interpret Dream",
+  "error": "Please enter or select a dream keyword",
+  "categories": {
+    "nature": "Nature",
+    "animals": "Animals",
+    "body": "Body",
+    "life": "Life",
+    "objects": "Objects",
+    "people": "People"
+  }
+}

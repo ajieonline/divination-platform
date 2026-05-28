@@ -1,0 +1,20 @@
+{
+  "title": "📝 Name Test",
+  "subtitle": "Names hold the密码 of destiny",
+  "singleMode": "Single Test",
+  "partnerMode": "Couple Test",
+  "quickFill": "Quick Fill",
+  "partnerQuickFill": "Partner Quick Fill",
+  "namePlaceholder": "Enter your name",
+  "partnerPlaceholder": "Enter partner's name",
+  "analyzing": "Analyzing...",
+  "startBtn": "Start Analysis",
+  "totalStrokes": "Total Strokes",
+  "element": "Five Elements",
+  "tianGe": "Tian Ge",
+  "renGe": "Ren Ge",
+  "diGe": "Di Ge",
+  "compatTitle": "Compatibility Analysis",
+  "compatIndex": "Affinity Index",
+  "aiTitle": "AI Deep Analysis"
+}

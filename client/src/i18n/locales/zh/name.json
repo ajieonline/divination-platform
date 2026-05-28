@@ -1,0 +1,20 @@
+{
+  "title": "📝 姓名测试",
+  "subtitle": "姓名蕴含命运密码",
+  "singleMode": "单人测试",
+  "partnerMode": "配对测试",
+  "quickFill": "快速填入",
+  "partnerQuickFill": "对方快速填入",
+  "namePlaceholder": "输入你的姓名",
+  "partnerPlaceholder": "输入对方姓名",
+  "analyzing": "分析中...",
+  "startBtn": "开始分析",
+  "totalStrokes": "总笔画",
+  "element": "五行属",
+  "tianGe": "天格",
+  "renGe": "人格",
+  "diGe": "地格",
+  "compatTitle": "配对分析",
+  "compatIndex": "缘分指数",
+  "aiTitle": "AI深度解析"
+}

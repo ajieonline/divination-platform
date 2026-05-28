@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./server
+    container_name: divination-backend
+    restart: always
+    volumes:
+      - divination-data:/data
+    networks:
+      - divination-net
+
+  frontend:
+    build: ./client
+    container_name: divination-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - divination-net
+
+volumes:
+  divination-data:
+
+networks:
+  divination-net:
+    driver: bridge

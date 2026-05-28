@@ -1,0 +1,76 @@
+{
+  "title": "☰ I Ching Divination",
+  "subtitle": "Coin toss divination, interpret the way of heaven and earth",
+  "coinMethod": "Coin Method",
+  "coinMethodDesc": "Divination using three coins",
+  "timeMethod": "Time Method",
+  "timeMethodDesc": "Auto divination based on current time",
+  "numberMethod": "Number Method",
+  "numberMethodDesc": "Enter two numbers for divination",
+  "coinToss": "Toss Coins",
+  "tossing": "Tossing...",
+  "result": "Hexagram Result",
+  "upperTrigram": "Upper Trigram",
+  "lowerTrigram": "Lower Trigram",
+  "changingLine": "Changing Line",
+  "interpretation": "Interpretation",
+  "aiAnalysis": "AI Deep Analysis",
+  "saveRecord": "Save Record",
+  "newDivination": "New Divination",
+  "questionTypes": {
+    "career": "Career",
+    "love": "Love",
+    "wealth": "Wealth",
+    "health": "Health",
+    "study": "Study",
+    "life": "Life"
+  },
+  "selectQuestionType": "Select Question Type",
+  "selectField": "Select the area you want to ask",
+  "quickQuestions": "Choose a common question, or type your own",
+  "inputQuestion": "Or type your question...",
+  "divining": "🔮 Divining...",
+  "startDivination": "☰ Start Divination",
+  "questionPrefix": "Question: ",
+  "aiTitle": "🤖 AI Hexagram Analysis",
+  "error": "Divination failed",
+  "lineLabel": "Line",
+  "categoryOptions": {
+    "career": [
+      "Career fortune this year",
+      "Good time to change jobs?",
+      "Best time to start business",
+      "Relationship with colleagues"
+    ],
+    "love": [
+      "Love fortune trend",
+      "When will I meet the right person?",
+      "Should we reconcile?",
+      "What are their feelings?"
+    ],
+    "wealth": [
+      "Recent wealth fortune",
+      "Is investment feasible?",
+      "Best time to buy property",
+      "Side business development"
+    ],
+    "health": [
+      "Health reminders",
+      "Wellness suggestions",
+      "When to get a checkup",
+      "Mental health"
+    ],
+    "study": [
+      "Exam fortune",
+      "Should I pursue further studies?",
+      "Learning direction",
+      "Major choice"
+    ],
+    "life": [
+      "Recent fortune trend",
+      "Good time to move?",
+      "Travel suggestions",
+      "Family harmony"
+    ]
+  }
+}

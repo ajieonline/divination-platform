@@ -1,0 +1,37 @@
+{
+  "title": "🙏 抽签问卦",
+  "subtitle": "虔诚祈祷，求签问卜",
+  "selectType": "选择签种",
+  "types": {
+    "guanyin": "观音灵签",
+    "guandi": "关帝灵签",
+    "huagong": "黄大仙灵签",
+    "wenchang": "文昌帝君灵签",
+    "yuelao": "月老灵签"
+  },
+  "draw": "🙏 求签",
+  "drawing": "🔮 摇签中...",
+  "signTitle": "签诗",
+  "signMeaning": "签意",
+  "signAdvice": "建议",
+  "aiInterpretation": "🤖 AI解签",
+  "saveRecord": "保存记录",
+  "newDraw": "重新求签",
+  "selectTypeLabel": "选择签种",
+  "selectTypePlaceholder": "选择签诗类型",
+  "quickQuestions": "快速选题",
+  "startDraw": "🙏 求签",
+  "typeLabel": "{type}",
+  "aiTitle": "🤖 AI解签",
+  "error": "求签失败",
+  "tryQuestions": [
+    "我的近期运势如何？",
+    "事业上会有什么变化？",
+    "感情方面需要注意什么？",
+    "财运走势怎样？",
+    "健康方面有什么提醒？",
+    "求学之路是否顺利？",
+    "创业是否时机成熟？",
+    "人际关系需要如何处理？"
+  ]
+}

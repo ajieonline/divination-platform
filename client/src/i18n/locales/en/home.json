@@ -1,0 +1,40 @@
+{
+  "hero": {
+    "title": "Explore the Mystery of Destiny",
+    "subtitle": "Professional AI Divination · Accurate Reading · Life Guidance",
+    "subtitle2": "Perfect fusion of ancient wisdom and modern AI",
+    "startBtn": "🔮 Start Divination",
+    "dailyBtn": "🌟 Today's Fortune"
+  },
+  "register": {
+    "title": "🎉 Register to unlock more features",
+    "desc": "Free registration gives you daily check-in, points redemption, history records and more",
+    "btn": "Register Free"
+  },
+  "features": {
+    "title": "🔮 Eight Divination Systems",
+    "tarot": { "title": "Tarot Reading", "desc": "Classic spread deep reading, reveal destiny guidance" },
+    "zodiac": { "title": "Horoscope", "desc": "Daily precise horoscope for 12 zodiac signs" },
+    "bazi": { "title": "BaZi Fortune", "desc": "Traditional fortune telling with precise chart" },
+    "iching": { "title": "I Ching", "desc": "Ancient I Ching wisdom answers your questions" },
+    "name": { "title": "Name Test", "desc": "Name stroke analysis and Five Elements" },
+    "sign": { "title": "Lot Draw", "desc": "Online fortune lot drawing" },
+    "dream": { "title": "AI Dream", "desc": "AI-powered dream interpretation" },
+    "daily": { "title": "Daily Fortune", "desc": "Your personalized daily zodiac fortune" }
+  },
+  "vip": {
+    "title": "VIP Membership",
+    "desc": "Unlock all 100+ divination features with exclusive service",
+    "monthly": "Monthly ¥29.9",
+    "yearly": "Yearly ¥199",
+    "quarterly": "Quarterly ¥69.9",
+    "perDay": "Only",
+    "activate": "Activate Now",
+    "activateNow": "🔥 Activate Now"
+  },
+  "daily": {
+    "title": "🌟 Daily Fortune",
+    "desc": "Check your personalized daily horoscope analysis",
+    "btn": "View Today's Fortune"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "vipCenter": "VIP 会员中心",
+  "loginPrompt": "登录后即可签到赚积分",
+  "checkinSuccess": "签到成功！+{{points}}分",
+  "alreadyCheckedIn": "今日已签到",
+  "checkinFailed": "签到失败，请重试",
+  "networkError": "网络错误，请检查网络后重试",
+  "insufficientPoints": "积分不足，继续签到攒积分吧！",
+  "redeemSuccess": "兑换成功！",
+  "redeemFailed": "兑换失败",
+  "heroTitle": "解锁命运的",
+  "heroHighlight": "无限可能",
+  "heroSubtitle": "100+ 种专业占卜 · 深度AI解读 · 专属会员特权",
+  "statMethods": "占卜方法",
+  "statUsers": "用户信赖",
+  "statRate": "好评率",
+  "registerFree": "免费注册，立即体验",
+  "tabPlans": "会员套餐",
+  "tabCompare": "免费vs VIP",
+  "tabPoints": "积分中心",
+  "tabReviews": "用户评价",
+  "bestValue": "最受欢迎",
+  "perDay": "每天仅",
+  "activateNow": "立即开通",
+  "loginToActivate": "登录后开通",
+  "myPoints": "我的积分",
+  "processing": "处理中...",
+  "todayCheckedIn": "今日已签到",
+  "dailyCheckin": "每日签到 +10分",
+  "loginToEarnPoints": "登录后即可签到赚积分，兑换专属权益",
+  "loginOrRegister": "立即登录 / 注册",
+  "earnTitle": "积分获取方式",
+  "pointsUnit": "分",
+  "verifiedVip": "已验证VIP",
+  "planNames": {
+    "monthly": "月卡",
+    "quarterly": "季卡",
+    "yearly": "年卡"
+  },
+  "features": {
+    "unlimited": "全部100+占卜无限使用",
+    "deepReport": "专属深度分析报告",
+    "cloudHistory": "历史记录云端保存",
+    "doublePoints": "每日签到双倍积分",
+    "monthlyAll": "月卡全部权益",
+    "vipConsult": "VIP专属占卜师1v1",
+    "birthdayFree": "生日月免费占卜3次",
+    "priorityAccess": "优先体验新功能",
+    "quarterlyAll": "季卡全部权益",
+    "freeSalon": "免费参加线上占卜沙龙",
+    "customReport": "定制个人运势报告",
+    "vipSupport": "专属客服通道"
+  },
+  "compareHeaders": {
+    "feature": "功能",
+    "free": "免费用户"
+  },
+  "compareFeatures": [
+    {
+      "feature": "每日运势",
+      "free": "基础概览",
+      "vip": "详细分析+幸运指南"
+    },
+    {
+      "feature": "塔罗占卜",
+      "free": "单牌每天1次",
+      "vip": "所有牌阵无限次"
+    },
+    {
+      "feature": "八字命理",
+      "free": "基础排盘",
+      "vip": "深度精批+流年分析"
+    },
+    {
+      "feature": "AI解梦",
+      "free": "简单释义",
+      "vip": "心理学深度解读"
+    },
+    {
+      "feature": "姓名测试",
+      "free": "笔画吉凶",
+      "vip": "五格三才全面分析"
+    },
+    {
+      "feature": "历史记录",
+      "free": "仅最近5条",
+      "vip": "无限保存"
+    }
+  ],
+  "earnMethods": [
+    {
+      "action": "每日签到",
+      "points": "+10"
+    },
+    {
+      "action": "分享占卜结果",
+      "points": "+20"
+    },
+    {
+      "action": "邀请好友注册",
+      "points": "+100"
+    },
+    {
+      "action": "完成首次占卜",
+      "points": "+50"
+    }
+  ],
+  "redeemItems": [
+    {
+      "icon": "🎯",
+      "name": "兑换单次塔罗",
+      "cost": 500,
+      "desc": "免费获得一次三牌阵占卜"
+    },
+    {
+      "icon": "📊",
+      "name": "兑换八字精批",
+      "cost": 800,
+      "desc": "免费获得一次八字深度分析"
+    },
+    {
+      "icon": "💎",
+      "name": "兑换VIP月卡",
+      "cost": 2000,
+      "desc": "免费获得30天VIP会员"
+    },
+    {
+      "icon": "🎁",
+      "name": "兑换专属报告",
+      "cost": 300,
+      "desc": "获得一份个人运势详细报告"
+    }
+  ],
+  "reviews": {
+    "xiaoyu": {
+      "name": "小雨",
+      "text": "用了三个月塔罗三牌阵，每次解读都很准，特别是感情方面的指引，帮我度过了迷茫期。"
+    },
+    "xingchen": {
+      "name": "星辰",
+      "text": "八字命理的深度分析让我更了解自己的性格和优势，事业上做出了正确的选择。"
+    },
+    "nuannuan": {
+      "name": "暖暖",
+      "text": "年卡太值了！AI解梦功能特别有趣，每天早上看每日运势已经成为习惯。"
+    }
+  },
+  "comingSoon": "支付功能即将上线，敬请期待！"
+}

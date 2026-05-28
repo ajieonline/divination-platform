@@ -1,0 +1,76 @@
+{
+  "title": "☰ 易经六爻",
+  "subtitle": "铜钱起卦，解读天地之道",
+  "coinMethod": "铜钱摇卦",
+  "coinMethodDesc": "使用三枚铜钱起卦",
+  "timeMethod": "时间起卦",
+  "timeMethodDesc": "根据当前时间自动起卦",
+  "numberMethod": "数字起卦",
+  "numberMethodDesc": "输入两个数字起卦",
+  "coinToss": "投掷铜钱",
+  "tossing": "摇卦中...",
+  "result": "卦象结果",
+  "upperTrigram": "上卦",
+  "lowerTrigram": "下卦",
+  "changingLine": "动爻",
+  "interpretation": "卦象解读",
+  "aiAnalysis": "AI深入分析",
+  "saveRecord": "保存记录",
+  "newDivination": "重新起卦",
+  "questionTypes": {
+    "career": "事业",
+    "love": "爱情",
+    "wealth": "财运",
+    "health": "健康",
+    "study": "学业",
+    "life": "生活"
+  },
+  "selectQuestionType": "选择问题类型",
+  "selectField": "选择你想问的领域",
+  "quickQuestions": "选择一个常见问题，或手动输入",
+  "inputQuestion": "或手动输入你的问题...",
+  "divining": "🔮 起卦中...",
+  "startDivination": "☰ 摇卦",
+  "questionPrefix": "所问：",
+  "aiTitle": "🤖 AI卦象解读",
+  "error": "起卦失败",
+  "lineLabel": "爻",
+  "categoryOptions": {
+    "career": [
+      "今年的事业运势",
+      "是否适合跳槽",
+      "创业时机如何",
+      "与同事关系"
+    ],
+    "love": [
+      "感情运势走向",
+      "何时遇到对的人",
+      "是否应该复合",
+      "对方心意如何"
+    ],
+    "wealth": [
+      "近期财运如何",
+      "投资是否可行",
+      "买房时机",
+      "副业发展"
+    ],
+    "health": [
+      "身体状况提醒",
+      "养生建议",
+      "何时适合体检",
+      "心理健康"
+    ],
+    "study": [
+      "考试运势",
+      "是否适合深造",
+      "学习方向",
+      "专业选择"
+    ],
+    "life": [
+      "近期运势走向",
+      "搬家时机",
+      "旅行建议",
+      "家庭和谐"
+    ]
+  }
+}

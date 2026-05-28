@@ -1,0 +1,37 @@
+{
+  "title": "🙏 Lot Drawing",
+  "subtitle": "Pray sincerely, seek divine guidance",
+  "selectType": "Select Lot Type",
+  "types": {
+    "guanyin": "Guanyin Lot",
+    "guandi": "Guan Di Lot",
+    "huagong": "Wong Tai Sin Lot",
+    "wenchang": "Wenchang Lot",
+    "yuelao": "Moon Elder Lot"
+  },
+  "draw": "🙏 Draw Lot",
+  "drawing": "🔮 Drawing...",
+  "signTitle": "Lot Poem",
+  "signMeaning": "Meaning",
+  "signAdvice": "Advice",
+  "aiInterpretation": "🤖 AI Interpretation",
+  "saveRecord": "Save Record",
+  "newDraw": "Draw Again",
+  "selectTypeLabel": "Select Lot Type",
+  "selectTypePlaceholder": "Select lot type",
+  "quickQuestions": "Quick Questions",
+  "startDraw": "🙏 Draw Lot",
+  "typeLabel": "{type}",
+  "aiTitle": "🤖 AI Interpretation",
+  "error": "Failed to draw lot",
+  "tryQuestions": [
+    "How is my recent fortune?",
+    "What changes in career?",
+    "What should I focus on in love?",
+    "How are my finances?",
+    "Any health reminders?",
+    "Is my study going well?",
+    "Is it time to start a business?",
+    "How to handle relationships?"
+  ]
+}
