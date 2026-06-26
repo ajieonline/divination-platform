@@ -129,11 +129,9 @@ class PaymentEngine {
     this.db.prepare("UPDATE orders SET status = 'paid', pay_time = datetime('now') WHERE id = ?").run(order.id);
 
     // 处理VIP开通
-    if (order.product === 'vip_month') {
-      const expire = new Date(Date.now() + 30 * 86400000).toISOString();
-      this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
-    } else if (order.product === 'vip_year') {
-      const expire = new Date(Date.now() + 365 * 86400000).toISOString();
+    const vipDays = { vip_month: 30, vip_quarter: 90, vip_year: 365 }[order.product];
+    if (vipDays) {
+      const expire = new Date(Date.now() + vipDays * 86400000).toISOString();
       this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
     }
   }
@@ -222,11 +220,9 @@ class PaymentEngine {
     if (order.status === 'paid') return;
     this.db.prepare("UPDATE orders SET status = 'paid', pay_time = datetime('now') WHERE id = ?").run(order.id);
 
-    if (order.product === 'vip_month') {
-      const expire = new Date(Date.now() + 30 * 86400000).toISOString();
-      this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
-    } else if (order.product === 'vip_year') {
-      const expire = new Date(Date.now() + 365 * 86400000).toISOString();
+    const vipDays = { vip_month: 30, vip_quarter: 90, vip_year: 365 }[order.product];
+    if (vipDays) {
+      const expire = new Date(Date.now() + vipDays * 86400000).toISOString();
       this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
     }
   }

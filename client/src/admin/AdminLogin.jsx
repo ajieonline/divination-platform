@@ -69,10 +69,6 @@ export default function AdminLogin() {
             className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-indigo-700 transition disabled:opacity-50">
             {loading ? '登录中...' : '登录'}
           </button>
-          
-          <p className="text-center text-gray-500 text-sm mt-4">
-            默认账号: admin / admin123
-          </p>
         </form>
       </motion.div>
     </div>

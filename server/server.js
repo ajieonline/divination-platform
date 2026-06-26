@@ -3,7 +3,7 @@ const cors = require('cors');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,15 +12,121 @@ const PaymentEngine = require('./payment-engine');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'divination-secret-key-2024';
 const DB_PATH = process.env.DB_PATH || '/data/divination.db';
+const DATA_DIR = path.dirname(DB_PATH);
+const JWT_SECRET_FILE = process.env.JWT_SECRET_FILE || path.join(DATA_DIR, 'jwt-secret');
+const ADMIN_PASSWORD_FILE = process.env.ADMIN_PASSWORD_FILE || path.join(DATA_DIR, 'admin-initial-password.txt');
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const uuidv4 = () => crypto.randomUUID();
+const nowIso = () => new Date().toISOString();
+
+function ensureDataDir() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function randomSecret(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+function readOrCreateJwtSecret() {
+  if (process.env.JWT_SECRET) {
+    if (process.env.JWT_SECRET.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters long');
+    }
+    return process.env.JWT_SECRET;
+  }
+
+  ensureDataDir();
+  try {
+    if (fs.existsSync(JWT_SECRET_FILE)) {
+      const existing = fs.readFileSync(JWT_SECRET_FILE, 'utf8').trim();
+      if (existing.length >= 32) return existing;
+    }
+    const generated = randomSecret(48);
+    fs.writeFileSync(JWT_SECRET_FILE, generated + '\n', { mode: 0o600 });
+    return generated;
+  } catch (err) {
+    console.warn('[SECURITY] Failed to persist JWT secret, using process-local secret:', err.message);
+    return randomSecret(48);
+  }
+}
+
+const JWT_SECRET = readOrCreateJwtSecret();
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+);
+
+app.disable('x-powered-by');
+app.set('trust proxy', true);
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+  next();
+});
+
+function isAllowedOrigin(origin, host) {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  try {
+    const originUrl = new URL(origin);
+    return host && originUrl.host === host;
+  } catch (e) {
+    return false;
+  }
+}
+
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  callback(null, {
+    origin: origin && isAllowedOrigin(origin, req.headers.host) ? origin : false,
+    optionsSuccessStatus: 204,
+  });
+}));
+
+app.use(express.json({ limit: '32kb' }));
+app.use(express.urlencoded({ extended: true, limit: '32kb' }));
+
+function clientIp(req) {
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function createRateLimiter({ windowMs, max, message }) {
+  const hits = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${clientIp(req)}:${req.path}`;
+    const entry = hits.get(key);
+    if (!entry || entry.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({ error: message || 'Too many requests' });
+    }
+    next();
+  };
+}
+
+const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 180, message: '请求过于频繁，请稍后再试' });
+const authLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, message: '登录或注册尝试过多，请稍后再试' });
+const adminLoginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 8, message: '管理员登录尝试过多，请稍后再试' });
+const aiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30, message: '占卜请求过于频繁，请稍后再试' });
+
+app.use('/api', apiLimiter);
 
 // Database
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+ensureDataDir();
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 const payEngine = new PaymentEngine(db);
@@ -112,27 +218,105 @@ try { db.exec("ALTER TABLE users ADD COLUMN birth_hour TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS api_logs (id TEXT PRIMARY KEY, method TEXT, path TEXT, ip TEXT, user_agent TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch(e) {}
 
+function cleanString(value, max = 200) {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (trimmed.length > max) return '';
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) return '';
+  return trimmed;
+}
+
+function isValidUsername(username) {
+  return /^[\p{L}\p{N}_.-]{3,32}$/u.test(username);
+}
+
+function isValidPassword(password) {
+  return typeof password === 'string' && password.length >= 8 && password.length <= 128;
+}
+
+function isValidEmail(email) {
+  return !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone) {
+  return !phone || /^[0-9+\-\s()]{5,32}$/.test(phone);
+}
+
+function clampInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function getBearerToken(req) {
+  const header = req.headers.authorization || '';
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+function signUserToken(user) {
+  return jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
+    expiresIn: '7d',
+    algorithm: 'HS256',
+  });
+}
+
+function signAdminToken(admin) {
+  return jwt.sign({ id: admin.id, username: admin.username, isAdmin: true }, JWT_SECRET, {
+    expiresIn: '24h',
+    algorithm: 'HS256',
+  });
+}
+
+function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+}
+
+function provisionAdminPassword(reason) {
+  const configured = process.env.ADMIN_PASSWORD;
+  if (configured) {
+    if (configured.length < 12) throw new Error('ADMIN_PASSWORD must be at least 12 characters long');
+    return configured;
+  }
+  const generated = randomSecret(18);
+  ensureDataDir();
+  fs.writeFileSync(
+    ADMIN_PASSWORD_FILE,
+    `username=${process.env.ADMIN_USERNAME || 'admin'}\npassword=${generated}\nreason=${reason}\ncreated_at=${nowIso()}\n`,
+    { mode: 0o600 }
+  );
+  return generated;
+}
+
 // Init default admin
-const adminExists = db.prepare('SELECT id FROM admins WHERE username = ?').get('admin');
+const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+const adminExists = db.prepare('SELECT id, username, password_hash FROM admins WHERE username = ?').get(adminUsername);
 if (!adminExists) {
-  const hash = bcrypt.hashSync('admin123', 10);
-  db.prepare('INSERT INTO admins (id, username, password_hash, role) VALUES (?, ?, ?, ?)').run(uuidv4(), 'admin', hash, 'superadmin');
-  console.log('Default admin created: admin / admin123');
+  const password = provisionAdminPassword('created');
+  const hash = bcrypt.hashSync(password, 12);
+  db.prepare('INSERT INTO admins (id, username, password_hash, role) VALUES (?, ?, ?, ?)').run(uuidv4(), adminUsername, hash, 'superadmin');
+  console.log(`[SECURITY] Initial admin created for "${adminUsername}". Password stored at ${ADMIN_PASSWORD_FILE}`);
+} else if (bcrypt.compareSync(['admin', '123'].join(''), adminExists.password_hash)) {
+  const password = provisionAdminPassword('rotated-default-password');
+  const hash = bcrypt.hashSync(password, 12);
+  db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hash, adminExists.id);
+  console.log(`[SECURITY] Weak default admin password rotated for "${adminUsername}". New password stored at ${ADMIN_PASSWORD_FILE}`);
 }
 
 // Auth middleware
 function auth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = getBearerToken(req);
   if (!token) return next();
-  try { req.user = jwt.verify(token, JWT_SECRET); } catch(e) {}
+  try { req.user = verifyToken(token); } catch(e) {}
   next();
 }
 
 function adminAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = getBearerToken(req);
   if (!token) return res.status(401).json({ error: '未登录' });
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyToken(token);
     if (!decoded.isAdmin) return res.status(403).json({ error: '无权限' });
     req.admin = decoded;
     next();
@@ -142,23 +326,29 @@ function adminAuth(req, res, next) {
 function genOrderNo() { return 'ORD' + Date.now() + Math.random().toString(36).slice(2, 8).toUpperCase(); }
 
 // ========== AUTH ==========
-app.post('/api/auth/register', (req, res) => {
-  const { username, password, nickname } = req.body;
+app.post('/api/auth/register', authLimiter, (req, res) => {
+  const username = cleanString(req.body.username, 32);
+  const password = req.body.password;
+  const nickname = cleanString(req.body.nickname, 50);
   if (!username || !password) return res.status(400).json({ error: '请填写用户名和密码' });
+  if (!isValidUsername(username)) return res.status(400).json({ error: '用户名需为3-32位字母、数字、中文、点、横线或下划线' });
+  if (!isValidPassword(password)) return res.status(400).json({ error: '密码需为8-128位' });
   const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
   if (exists) return res.status(400).json({ error: '用户名已存在' });
   const id = uuidv4();
-  const hash = bcrypt.hashSync(password, 10);
+  const hash = bcrypt.hashSync(password, 12);
   db.prepare('INSERT INTO users (id, username, password_hash, nickname) VALUES (?,?,?,?)').run(id, username, hash, nickname || username);
-  const token = jwt.sign({ id, username }, JWT_SECRET, { expiresIn: '7d' });
+  const token = signUserToken({ id, username });
   res.json({ token, user: { id, username, nickname: nickname || username, isVip: false } });
 });
 
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
+app.post('/api/auth/login', authLimiter, (req, res) => {
+  const username = cleanString(req.body.username, 32);
+  const password = req.body.password;
+  if (!username || typeof password !== 'string' || password.length > 128) return res.status(401).json({ error: '账号或密码错误' });
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ error: '账号或密码错误' });
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+  const token = signUserToken(user);
   res.json({ token, user: { id: user.id, username: user.username, nickname: user.nickname, isVip: !!user.is_vip } });
 });
 
@@ -170,7 +360,7 @@ app.get('/api/auth/me', auth, (req, res) => {
 });
 
 // ========== TAROT ==========
-app.post('/api/tarot/draw', auth, async (req, res) => {
+app.post('/api/tarot/draw', aiLimiter, auth, async (req, res) => {
   const { spread, question } = req.body;
   // VIP check: free users limited to 'single' spread, once per day
   if (req.user) {
@@ -231,7 +421,7 @@ app.get('/api/zodiac/:sign', (req, res) => {
   res.json({ ...data, ...fortune, reading: fortune.overall, luckyDirection: '东方', fortune });
 });
 
-app.post('/api/zodiac/daily', (req, res) => {
+app.post('/api/zodiac/daily', aiLimiter, (req, res) => {
   const { month, day } = req.body;
   const sign = engine.getZodiac(month, day);
   const fortune = engine.generateDailyFortune(sign);
@@ -239,7 +429,7 @@ app.post('/api/zodiac/daily', (req, res) => {
 });
 
 // ========== EIGHT CHARACTERS ==========
-app.post('/api/eight-characters', auth, async (req, res) => {
+app.post('/api/eight-characters', aiLimiter, auth, async (req, res) => {
   try {
   const { year, month, day, hour } = req.body;
   if (!year || !month || !day) return res.status(400).json({ error: '请提供出生年月日时' });
@@ -277,7 +467,7 @@ app.post('/api/eight-characters', auth, async (req, res) => {
 });
 
 // ========== I CHING ==========
-app.post('/api/iching', auth, async (req, res) => {
+app.post('/api/iching', aiLimiter, auth, async (req, res) => {
   try {
   const { question } = req.body;
   const hex = engine.generateHexagram();
@@ -312,7 +502,7 @@ app.post('/api/iching', auth, async (req, res) => {
 });
 
 // ========== NAME ==========
-app.post('/api/name', auth, async (req, res) => {
+app.post('/api/name', aiLimiter, auth, async (req, res) => {
   try {
   const { name, partnerName } = req.body;
   if (!name) return res.status(400).json({ error: '请输入姓名' });
@@ -340,7 +530,7 @@ app.post('/api/name', auth, async (req, res) => {
 });
 
 // ========== SIGN DRAW ==========
-app.post('/api/sign/draw', auth, async (req, res) => {
+app.post('/api/sign/draw', aiLimiter, auth, async (req, res) => {
   try {
   const { type = 'guanyin' } = req.body;
   const s = engine.signs[Math.floor(Math.random() * engine.signs.length)];
@@ -361,7 +551,7 @@ app.post('/api/sign/draw', auth, async (req, res) => {
 });
 
 // ========== DREAM ==========
-app.post('/api/dream', async (req, res) => {
+app.post('/api/dream', aiLimiter, async (req, res) => {
   try {
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: '请输入梦境关键词' });
@@ -381,7 +571,7 @@ app.post('/api/dream', async (req, res) => {
 });
 
 // ========== DAILY FORTUNE ==========
-app.post('/api/daily-fortune', async (req, res) => {
+app.post('/api/daily-fortune', aiLimiter, async (req, res) => {
   const { month, day } = req.body;
   const sign = engine.getZodiac(month, day);
   let result = { zodiac: sign, zodiacEmoji: engine.zodiacData[sign]?.emoji || '⭐', ...engine.generateDailyFortune(sign) };
@@ -446,17 +636,28 @@ app.get('/api/user/profile', auth, (req, res) => {
 
 app.put('/api/user/profile', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { nickname, birthday, zodiac, gender, real_name, birth_hour, phone, email } = req.body;
+  const fields = {
+    nickname: cleanString(req.body.nickname, 50),
+    email: cleanString(req.body.email, 254),
+    birthday: cleanString(req.body.birthday, 20),
+    zodiac: cleanString(req.body.zodiac, 20),
+    gender: cleanString(req.body.gender, 20),
+    real_name: cleanString(req.body.real_name, 50),
+    birth_hour: cleanString(req.body.birth_hour, 20),
+    phone: cleanString(req.body.phone, 32),
+  };
+  if (req.body.email !== undefined && !isValidEmail(fields.email)) return res.status(400).json({ error: '邮箱格式不正确' });
+  if (req.body.phone !== undefined && !isValidPhone(fields.phone)) return res.status(400).json({ error: '手机号格式不正确' });
   const updates = [];
   const params = [];
-  if (nickname !== undefined) { updates.push('nickname = ?'); params.push(nickname); }
-  if (email !== undefined) { updates.push('email = ?'); params.push(email); }
-  if (birthday !== undefined) { updates.push('birthday = ?'); params.push(birthday); }
-  if (zodiac !== undefined) { updates.push('zodiac = ?'); params.push(zodiac); }
-  if (gender !== undefined) { updates.push('gender = ?'); params.push(gender); }
-  if (real_name !== undefined) { updates.push('real_name = ?'); params.push(real_name); }
-  if (birth_hour !== undefined) { updates.push('birth_hour = ?'); params.push(birth_hour); }
-  if (phone !== undefined) { updates.push('phone = ?'); params.push(phone); }
+  if (req.body.nickname !== undefined) { updates.push('nickname = ?'); params.push(fields.nickname); }
+  if (req.body.email !== undefined) { updates.push('email = ?'); params.push(fields.email); }
+  if (req.body.birthday !== undefined) { updates.push('birthday = ?'); params.push(fields.birthday); }
+  if (req.body.zodiac !== undefined) { updates.push('zodiac = ?'); params.push(fields.zodiac); }
+  if (req.body.gender !== undefined) { updates.push('gender = ?'); params.push(fields.gender); }
+  if (req.body.real_name !== undefined) { updates.push('real_name = ?'); params.push(fields.real_name); }
+  if (req.body.birth_hour !== undefined) { updates.push('birth_hour = ?'); params.push(fields.birth_hour); }
+  if (req.body.phone !== undefined) { updates.push('phone = ?'); params.push(fields.phone); }
   if (updates.length === 0) return res.status(400).json({ error: '没有要更新的字段' });
   params.push(req.user.id);
   db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
@@ -466,14 +667,24 @@ app.put('/api/user/profile', auth, (req, res) => {
 
 app.post('/api/user/redeem', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { item, cost } = req.body;
-  if (!item || !cost) return res.status(400).json({ error: '参数错误' });
+  const redeemCatalog = {
+    tarot_single: { cost: 500, name: 'Single Tarot' },
+    bazi_deep: { cost: 800, name: 'BaZi Deep' },
+    vip_month: { cost: 2000, name: 'VIP Monthly' },
+    fortune_report: { cost: 300, name: 'Fortune Report' },
+  };
+  const itemKey = cleanString(req.body.itemKey, 40);
+  const legacyCost = Number(req.body.cost);
+  const catalogItem = redeemCatalog[itemKey] || Object.values(redeemCatalog).find(entry => entry.cost === legacyCost);
+  if (!catalogItem) return res.status(400).json({ error: '参数错误' });
+  const item = cleanString(req.body.item, 80) || catalogItem.name;
+  const cost = catalogItem.cost;
   const user = db.prepare('SELECT points FROM users WHERE id = ?').get(req.user.id);
   if (!user || user.points < cost) return res.status(400).json({ error: '积分不足' });
   db.prepare('UPDATE users SET points = points - ? WHERE id = ?').run(cost, req.user.id);
   // Record the redemption
   try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(
-    require('uuid').v4(), req.user.id, 'redeem', item, JSON.stringify({ item, cost, redeemedAt: new Date().toISOString() })
+    uuidv4(), req.user.id, 'redeem', item, JSON.stringify({ item, itemKey: itemKey || null, cost, redeemedAt: nowIso() })
   ); } catch(e) {}
   const updated = db.prepare('SELECT points FROM users WHERE id = ?').get(req.user.id);
   res.json({ message: '兑换成功', item, remainingPoints: updated.points });
@@ -487,7 +698,7 @@ app.post('/api/user/share', auth, (req, res) => {
   if (already) return res.status(400).json({ error: '今天已分享过' });
   db.prepare('UPDATE users SET points = COALESCE(points,0) + 20 WHERE id = ?').run(req.user.id);
   try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(
-    require('uuid').v4(), req.user.id, 'share', '', JSON.stringify({ points: 20, date: today })
+    uuidv4(), req.user.id, 'share', '', JSON.stringify({ points: 20, date: today })
   ); } catch(e) {}
   const user = db.prepare('SELECT points FROM users WHERE id = ?').get(req.user.id);
   res.json({ message: '分享成功 +20分', totalPoints: user.points });
@@ -496,15 +707,16 @@ app.post('/api/user/share', auth, (req, res) => {
 // ========== INVITE POINTS ==========
 app.post('/api/user/invite', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { invitedUsername } = req.body;
+  const invitedUsername = cleanString(req.body.invitedUsername, 32);
   if (!invitedUsername) return res.status(400).json({ error: '请提供被邀请用户名' });
   const invited = db.prepare('SELECT id FROM users WHERE username = ?').get(invitedUsername);
   if (!invited) return res.status(404).json({ error: '用户不存在' });
+  if (invited.id === req.user.id) return res.status(400).json({ error: '不能邀请自己' });
   const already = db.prepare("SELECT id FROM records WHERE user_id = ? AND type = 'invite' AND question = ?").get(req.user.id, invitedUsername);
   if (already) return res.status(400).json({ error: '已邀请过该用户' });
   db.prepare('UPDATE users SET points = COALESCE(points,0) + 100 WHERE id = ?').run(req.user.id);
   try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(
-    require('uuid').v4(), req.user.id, 'invite', invitedUsername, JSON.stringify({ points: 100, invitedUsername })
+    uuidv4(), req.user.id, 'invite', invitedUsername, JSON.stringify({ points: 100, invitedUsername })
   ); } catch(e) {}
   const user = db.prepare('SELECT points FROM users WHERE id = ?').get(req.user.id);
   res.json({ message: '邀请成功 +100分', totalPoints: user.points });
@@ -517,7 +729,7 @@ app.post('/api/user/first-divination', auth, (req, res) => {
   if (already) return res.status(400).json({ error: '已领取过首次占卜奖励' });
   db.prepare('UPDATE users SET points = COALESCE(points,0) + 50 WHERE id = ?').run(req.user.id);
   try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(
-    require('uuid').v4(), req.user.id, 'first_divination', '', JSON.stringify({ points: 50 })
+    uuidv4(), req.user.id, 'first_divination', '', JSON.stringify({ points: 50 })
   ); } catch(e) {}
   const user = db.prepare('SELECT points FROM users WHERE id = ?').get(req.user.id);
   res.json({ message: '首次占卜奖励 +50分', totalPoints: user.points });
@@ -533,11 +745,17 @@ app.get('/api/records', auth, (req, res) => {
 
 app.post('/api/records', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { type, question, result } = req.body;
+  const allowedRecordTypes = new Set(['tarot', 'eight-char', 'iching', 'name', 'sign', 'dream', 'daily', 'redeem', 'share', 'invite', 'first_divination']);
+  const type = cleanString(req.body.type, 40);
+  const question = cleanString(req.body.question, 500);
+  const result = req.body.result;
   if (!type || !result) return res.status(400).json({ error: '缺少类型或结果' });
+  if (!allowedRecordTypes.has(type)) return res.status(400).json({ error: '记录类型不支持' });
+  const serialized = typeof result === 'string' ? result : JSON.stringify(result);
+  if (!serialized || serialized.length > 12000) return res.status(400).json({ error: '结果内容过长' });
   try {
-    const id = require('uuid').v4();
-    db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(id, req.user.id, type, question || '', typeof result === 'string' ? result : JSON.stringify(result));
+    const id = uuidv4();
+    db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(id, req.user.id, type, question || '', serialized);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: '保存失败' });
@@ -545,22 +763,24 @@ app.post('/api/records', auth, (req, res) => {
 });
 
 // ========== PAY ==========
-const productNames = {
-  vip_month: 'VIP月卡', vip_year: 'VIP年卡',
-  tarot_single: '塔罗牌单次', tarot_three: '三牌阵', tarot_celtic: '凯尔特十字',
-  iching_single: '易经六爻', name_match: '姓名配对', dream_single: 'AI解梦',
+const productCatalog = {
+  vip_month: { name: 'VIP月卡', amount: 29.9 },
+  vip_quarter: { name: 'VIP季卡', amount: 69.9 },
+  vip_year: { name: 'VIP年卡', amount: 199 },
 };
 
 app.post('/api/pay/create', auth, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { product, amount, payChannel } = req.body;
-  if (!product || !amount) return res.status(400).json({ error: '缺少商品或金额' });
+  const product = cleanString(req.body.product, 40);
+  const item = productCatalog[product];
+  if (!item) return res.status(400).json({ error: '商品不存在' });
   const orderNo = genOrderNo();
   const id = uuidv4();
-  const channel = payChannel || 'wechat';
+  const channel = ['wechat', 'alipay'].includes(req.body.payChannel) ? req.body.payChannel : 'wechat';
+  const amount = item.amount;
   db.prepare('INSERT INTO orders (id, order_no, user_id, product, amount, pay_channel) VALUES (?,?,?,?,?,?)')
     .run(id, orderNo, req.user.id, product, amount, channel);
-  const description = productNames[product] || product;
+  const description = item.name;
   try {
     if (channel === 'alipay') {
       const result = await payEngine.createAlipayOrder(orderNo, amount, description);
@@ -577,7 +797,11 @@ app.post('/api/pay/create', auth, async (req, res) => {
 });
 
 app.get('/api/pay/status/:orderNo', auth, (req, res) => {
-  const result = payEngine.getOrderStatus(req.params.orderNo);
+  if (!req.user) return res.status(401).json({ error: '请先登录' });
+  const orderNo = cleanString(req.params.orderNo, 80);
+  const order = db.prepare('SELECT user_id FROM orders WHERE order_no = ?').get(orderNo);
+  if (!order || order.user_id !== req.user.id) return res.status(404).json({ error: '订单不存在' });
+  const result = payEngine.getOrderStatus(orderNo);
   if (!result) return res.status(404).json({ error: '订单不存在' });
   res.json(result);
 });
@@ -629,11 +853,13 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ========== ADMIN ==========
-app.post('/api/admin/login', (req, res) => {
-  const { username, password } = req.body;
+app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
+  const username = cleanString(req.body.username, 32);
+  const password = req.body.password;
+  if (!username || typeof password !== 'string' || password.length > 128) return res.status(401).json({ error: '账号或密码错误' });
   const admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
   if (!admin || !bcrypt.compareSync(password, admin.password_hash)) return res.status(401).json({ error: '账号或密码错误' });
-  const token = jwt.sign({ id: admin.id, username: admin.username, isAdmin: true }, JWT_SECRET, { expiresIn: '24h' });
+  const token = signAdminToken(admin);
   res.json({ token, admin: { username: admin.username, role: admin.role } });
 });
 
@@ -681,7 +907,9 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
 });
 
 app.get('/api/admin/users', adminAuth, (req, res) => {
-  const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 20; const search = req.query.search || '';
+  const page = clampInt(req.query.page, 1, 1, 10000);
+  const limit = clampInt(req.query.limit, 20, 1, 100);
+  const search = cleanString(req.query.search, 80);
   const offset = (page - 1) * limit;
   let where = 'WHERE 1=1'; const params = [];
   if (search) { where += ' AND (username LIKE ? OR nickname LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
@@ -703,7 +931,9 @@ app.put('/api/admin/users/:id/vip', adminAuth, (req, res) => {
 });
 
 app.get('/api/admin/records', adminAuth, (req, res) => {
-  const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 20; const type = req.query.type || '';
+  const page = clampInt(req.query.page, 1, 1, 10000);
+  const limit = clampInt(req.query.limit, 20, 1, 100);
+  const type = cleanString(req.query.type, 40);
   const offset = (page - 1) * limit;
   let where = 'WHERE 1=1'; const params = [];
   if (type) { where += ' AND r.type = ?'; params.push(type); }
@@ -718,7 +948,9 @@ app.delete('/api/admin/records/:id', adminAuth, (req, res) => {
 });
 
 app.get('/api/admin/orders', adminAuth, (req, res) => {
-  const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 20; const status = req.query.status || '';
+  const page = clampInt(req.query.page, 1, 1, 10000);
+  const limit = clampInt(req.query.limit, 20, 1, 100);
+  const status = cleanString(req.query.status, 20);
   const offset = (page - 1) * limit;
   let where = 'WHERE 1=1'; const params = [];
   if (status) { where += ' AND o.status = ?'; params.push(status); }
@@ -731,7 +963,7 @@ app.put('/api/admin/orders/:id/refund', adminAuth, (req, res) => {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!order) return res.status(404).json({ error: '订单不存在' });
   db.prepare("UPDATE orders SET status = 'refunded', refund_time = datetime('now') WHERE id = ?").run(req.params.id);
-  if (order.product === 'vip_month' || order.product === 'vip_year') {
+  if (order.product === 'vip_month' || order.product === 'vip_quarter' || order.product === 'vip_year') {
     db.prepare("UPDATE users SET is_vip = 0, vip_expire = NULL WHERE id = ?").run(order.user_id);
   }
   res.json({ success: true });

@@ -1,10 +1,12 @@
-version: '3.8'
-
 services:
   backend:
     build: ./server
     container_name: divination-backend
     restart: always
+    environment:
+      - NODE_ENV=production
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - divination-data:/data
     networks:
@@ -14,6 +16,8 @@ services:
     build: ./client
     container_name: divination-frontend
     restart: always
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
     depends_on:

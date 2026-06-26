@@ -62,14 +62,14 @@ export default function VipCenter() {
     setCheckinLoading(false)
   }
 
-  const handleRedeem = async (cost, name) => {
+  const handleRedeem = async (cost, name, itemKey) => {
     if (!user) { setShowLogin(true); return }
     if (points < cost) { alert(t('insufficientPoints')); return }
     try {
       const res = await fetch('/api/user/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ item: name, cost })
+        body: JSON.stringify({ item: name, itemKey })
       })
       const data = await res.json()
       if (res.ok) { setPoints(data.remainingPoints || points - cost); alert(t('redeemSuccess')) }
@@ -98,6 +98,7 @@ export default function VipCenter() {
   const compareFeatures = t('compareFeatures', { returnObjects: true })
   const earnMethods = t('earnMethods', { returnObjects: true })
   const redeemItems = t('redeemItems', { returnObjects: true })
+  const redeemKeys = ['tarot_single', 'bazi_deep', 'vip_month', 'fortune_report']
 
   const tabs = [
     { id: 'plans', label: t('tabPlans') },
@@ -240,7 +241,7 @@ export default function VipCenter() {
                     <div className="font-bold text-white text-sm">{item.name}</div>
                     <div className="text-xs text-gray-400">{item.desc}</div>
                   </div>
-                  <button onClick={() => handleRedeem(item.cost, item.name)}
+                  <button onClick={() => handleRedeem(item.cost, item.name, redeemKeys[i])}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${user ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'}`}>
                     {item.cost}{t('pointsUnit')}
                   </button>
