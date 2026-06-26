@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>煤炭数据平台 - 实时行情</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); color: white; padding: 20px; text-align: center; }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.8; }
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-card h3 { color: #666; font-size: 14px; margin-bottom: 10px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #1a365d; }
+        .stat-card .change { font-size: 12px; margin-top: 5px; }
+        .stat-card .change.up { color: #e53e3e; }
+        .stat-card .change.down { color: #38a169; }
+        .chart-container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .chart-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 15px; }
+        .chart { height: 400px; }
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #555; }
+        .data-table tr:hover { background: #f8f9fa; }
+        .price-up { color: #e53e3e; }
+        .price-down { color: #38a169; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: white; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: #1a365d; color: white; border-color: #1a365d; }
+        .tab:hover:not(.active) { background: #f0f0f0; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .member-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .member-badge.free { background: #e2e8f0; color: #718096; }
+        .member-badge.premium { background: #fef3c7; color: #d97706; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <h1>煤炭数据平台</h1>
+            <p>实时行情 · 价格趋势 · 预测分析</p>
+        </div>
+        
+        <div class="container">
+            <!-- 统计卡片 -->
+            <div class="stats">
+                <div class="stat-card" v-for="stat in stats" :key="stat.name">
+                    <h3>{{ stat.name }}</h3>
+                    <div class="value">{{ stat.value }}</div>
+                    <div :class="['change', stat.change > 0 ? 'up' : 'down']">
+                        {{ stat.change > 0 ? '↑' : '↓' }} {{ Math.abs(stat.change) }}%
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 煤种切换 -->
+            <div class="tabs">
+                <div 
+                    v-for="type in coalTypes" 
+                    :key="type"
+                    :class="['tab', selectedType === type ? 'active' : '']"
+                    @click="selectType(type)"
+                >
+                    {{ type }}
+                </div>
+            </div>
+            
+            <!-- 价格趋势图 -->
+            <div class="chart-container">
+                <div class="chart-title">价格趋势 - {{ selectedType }}</div>
+                <div id="priceChart" class="chart"></div>
+            </div>
+            
+            <!-- 价格表格 -->
+            <div class="chart-container">
+                <div class="chart-title">历史价格数据</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>煤种</th>
+                            <th>地区</th>
+                            <th>价格 (元/吨)</th>
+                            <th>涨跌</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(item, index) in priceData" :key="item.id">
+                            <td>{{ item.date }}</td>
+                            <td>{{ item.coal_type }}</td>
+                            <td>{{ item.region }}</td>
+                            <td>{{ item.price.toFixed(2) }}</td>
+                            <td :class="getChangeClass(index)">
+                                {{ getChangeText(index) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 预测数据 -->
+            <div class="chart-container">
+                <div class="chart-title">价格预测</div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>预测日期</th>
+                            <th>煤种</th>
+                            <th>预测价格</th>
+                            <th>置信区间</th>
+                            <th>模型版本</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="item in predictions" :key="item.id">
+                            <td>{{ item.prediction_date }}</td>
+                            <td>{{ item.coal_type }}</td>
+                            <td>{{ item.predicted_price.toFixed(2) }}</td>
+                            <td>{{ item.confidence_lower?.toFixed(0) }} - {{ item.confidence_upper?.toFixed(0) }}</td>
+                            <td>{{ item.model_version }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const { createApp, ref, onMounted, watch } = Vue;
+        
+        createApp({
+            setup() {
+                const coalTypes = ref(['动力煤', '焦煤', '无烟煤']);
+                const selectedType = ref('动力煤');
+                const priceData = ref([]);
+                const predictions = ref([]);
+                const stats = ref([]);
+                let priceChart = null;
+                
+                const API_BASE = '/api/v1';
+                
+                const fetchPrices = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/prices/${selectedType.value}`);
+                        const data = await response.json();
+                        priceData.value = data;
+                        updateStats(data);
+                        updateChart(data);
+                    } catch (error) {
+                        console.error('获取价格数据失败:', error);
+                    }
+                };
+                
+                const fetchPredictions = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/predictions/${selectedType.value}`);
+                        predictions.value = await response.json();
+                    } catch (error) {
+                        console.error('获取预测数据失败:', error);
+                    }
+                };
+                
+                const updateStats = (data) => {
+                    if (data.length === 0) return;
+                    
+                    const latest = data[0];
+                    const previous = data[1] || latest;
+                    const change = ((latest.price - previous.price) / previous.price * 100).toFixed(2);
+                    
+                    stats.value = [
+                        { name: '当前价格', value: `${latest.price.toFixed(2)} 元/吨`, change: parseFloat(change) },
+                        { name: '最高价格', value: `${Math.max(...data.map(d => d.price)).toFixed(2)} 元/吨`, change: 0 },
+                        { name: '最低价格', value: `${Math.min(...data.map(d => d.price)).toFixed(2)} 元/吨`, change: 0 },
+                        { name: '数据条数', value: data.length, change: 0 }
+                    ];
+                };
+                
+                const updateChart = (data) => {
+                    const chartDom = document.getElementById('priceChart');
+                    if (!chartDom) return;
+                    
+                    if (!priceChart) {
+                        priceChart = echarts.init(chartDom);
+                    }
+                    
+                    const reversedData = [...data].reverse();
+                    const dates = reversedData.map(d => d.date);
+                    const prices = reversedData.map(d => d.price);
+                    
+                    const option = {
+                        tooltip: {
+                            trigger: 'axis',
+                            formatter: '{b}<br/>价格: {c} 元/吨'
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'category',
+                            boundaryGap: false,
+                            data: dates
+                        },
+                        yAxis: {
+                            type: 'value',
+                            axisLabel: {
+                                formatter: '{value} 元/吨'
+                            }
+                        },
+                        series: [{
+                            name: '价格',
+                            type: 'line',
+                            smooth: true,
+                            lineStyle: {
+                                color: '#1a365d',
+                                width: 3
+                            },
+                            areaStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: 'rgba(26, 54, 93, 0.3)' },
+                                    { offset: 1, color: 'rgba(26, 54, 93, 0.05)' }
+                                ])
+                            },
+                            itemStyle: {
+                                color: '#1a365d'
+                            },
+                            data: prices
+                        }]
+                    };
+                    
+                    priceChart.setOption(option);
+                };
+                
+                const selectType = (type) => {
+                    selectedType.value = type;
+                    fetchPrices();
+                    fetchPredictions();
+                };
+                
+                const getChangeClass = (index) => {
+                    if (index >= priceData.value.length - 1) return '';
+                    const current = priceData.value[index].price;
+                    const previous = priceData.value[index + 1].price;
+                    return current > previous ? 'price-up' : 'price-down';
+                };
+                
+                const getChangeText = (index) => {
+                    if (index >= priceData.value.length - 1) return '-';
+                    const current = priceData.value[index].price;
+                    const previous = priceData.value[index + 1].price;
+                    const change = ((current - previous) / previous * 100).toFixed(2);
+                    return `${change > 0 ? '+' : ''}${change}%`;
+                };
+                
+                onMounted(() => {
+                    fetchPrices();
+                    fetchPredictions();
+                    
+                    window.addEventListener('resize', () => {
+                        if (priceChart) {
+                            priceChart.resize();
+                        }
+                    });
+                });
+                
+                return {
+                    coalTypes,
+                    selectedType,
+                    priceData,
+                    predictions,
+                    stats,
+                    selectType,
+                    getChangeClass,
+                    getChangeText
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

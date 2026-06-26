@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: coal-data-postgres
+    environment:
+      POSTGRES_DB: coal_data_mvp
+      POSTGRES_USER: coal_admin
+      POSTGRES_PASSWORD: coal_secret_2024
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coal_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: coal-data-redis
+    ports:
+      - "6381:6379"
+    restart: unless-stopped
+
+  # 后端API服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: coal-data-backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: coal_admin
+      DB_PASSWORD: coal_secret_2024
+      DB_NAME: coal_data_mvp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: coal_jwt_secret_2024
+    ports:
+      - "3002:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: coal-data-frontend
+    ports:
+      - "9000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
