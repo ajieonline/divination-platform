@@ -413,8 +413,30 @@ app.get('/api/zodiac', (req, res) => {
   res.json(Object.entries(engine.zodiacData).map(([name, data]) => ({ name, ...data })));
 });
 
+const zodiacAliases = {
+  aries: '\u767d\u7f8a\u5ea7',
+  taurus: '\u91d1\u725b\u5ea7',
+  gemini: '\u53cc\u5b50\u5ea7',
+  cancer: '\u5de8\u87f9\u5ea7',
+  leo: '\u72ee\u5b50\u5ea7',
+  virgo: '\u5904\u5973\u5ea7',
+  libra: '\u5929\u79e4\u5ea7',
+  scorpio: '\u5929\u874e\u5ea7',
+  sagittarius: '\u5c04\u624b\u5ea7',
+  capricorn: '\u6469\u7faf\u5ea7',
+  aquarius: '\u6c34\u74f6\u5ea7',
+  pisces: '\u53cc\u9c7c\u5ea7',
+};
+
+function normalizeZodiacSign(value) {
+  const sign = cleanString(value, 40);
+  if (engine.zodiacData[sign]) return sign;
+  const aliasKey = sign.toLowerCase().replace(/[\s_-]+/g, '');
+  return zodiacAliases[aliasKey] || sign;
+}
+
 app.get('/api/zodiac/:sign', (req, res) => {
-  const z = decodeURIComponent(req.params.sign);
+  const z = normalizeZodiacSign(decodeURIComponent(req.params.sign));
   const data = engine.zodiacData[z];
   if (!data) return res.status(404).json({ error: '未找到' });
   const fortune = engine.generateDailyFortune(z);

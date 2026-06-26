@@ -159,7 +159,7 @@ export default function App() {
       <BrowserRouter>
         <div className="min-h-screen app-shell">
           <Routes>
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/*" element={<Admin />} />
             <Route path="*" element={
               <>
                 <NavBar />
@@ -176,6 +176,7 @@ export default function App() {
                     <Route path="/daily" element={<DailyFortune />} />
                     <Route path="/vip" element={<VipCenter />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="*" element={<Home />} />
                   </Routes>
                 </div>
               </>
