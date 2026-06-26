@@ -28,19 +28,22 @@ export default function Profile() {
   const [isLogin, setIsLogin] = useState(true)
   const [form, setForm] = useState({ username: '', password: '', nickname: '' })
   const [loading, setLoading] = useState(false)
-  const [profileForm, setProfileForm] = useState({ nickname: '', realName: '', gender: '', zodiac: '', birthday: '', phone: '', email: '' })
+  const [profileForm, setProfileForm] = useState({ nickname: '', realName: '', gender: '', zodiac: '', birthday: '', birthHour: '', phone: '', email: '' })
   const [profileMsg, setProfileMsg] = useState('')
   const [records, setRecords] = useState([])
-  const [points, setPoints] = useState(0)
-  const [signed, setSigned] = useState(false)
 
   useEffect(() => {
     if (user) {
       setProfileForm({
-        nickname: user.nickname || '', realName: user.realName || '', gender: user.gender || '',
-        zodiac: user.zodiac || '', birthday: user.birthday || '', phone: user.phone || '', email: user.email || ''
+        nickname: user.nickname || '',
+        realName: user.realName || user.real_name || '',
+        gender: user.gender || '',
+        zodiac: user.zodiac || '',
+        birthday: user.birthday || '',
+        birthHour: user.birthHour ?? user.birth_hour ?? '',
+        phone: user.phone || '',
+        email: user.email || ''
       })
-      setPoints(user.points || 0)
       fetch('/api/records', { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json()).then(d => { if (d.records) setRecords(d.records) }).catch(() => {})
     }
@@ -65,18 +68,36 @@ export default function Profile() {
   const saveProfile = async () => {
     setProfileMsg('')
     try {
+      const payload = {
+        nickname: profileForm.nickname,
+        real_name: profileForm.realName,
+        gender: profileForm.gender,
+        zodiac: profileForm.zodiac,
+        birthday: profileForm.birthday,
+        birth_hour: profileForm.birthHour,
+        phone: profileForm.phone,
+        email: profileForm.email
+      }
       const res = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(profileForm)
+        body: JSON.stringify(payload)
       })
       const data = await res.json()
-      if (res.ok) { setProfileMsg(t('saveSuccess')); login(data, token) }
+      if (res.ok) {
+        const saved = data.user || data
+        login({
+          ...saved,
+          realName: saved.realName || saved.real_name || profileForm.realName,
+          birthHour: saved.birthHour ?? saved.birth_hour ?? profileForm.birthHour
+        }, token)
+        setProfileMsg(t('saveSuccess'))
+      }
       else { setProfileMsg(data.error || t('saveError')) }
     } catch (e) { setProfileMsg(t('networkError')) }
   }
 
-  const typeLabels = { tarot: '🃏 Tarot', 'eight-characters': '☯️ BaZi', iching: '📖 I Ching', name: '✍️ Name Test', sign: '🎋 Lot Draw' }
+  const typeLabels = t('recordLabels', { returnObjects: true })
 
   if (!user) {
     return (
@@ -132,6 +153,8 @@ export default function Profile() {
               { key: 'zodiac', label: t('zodiac'), field: 'zodiac', dropdown: true,
                 options: zodiacList.map(z => ({ value: z, label: zodiacNames[lang][z], icon: zodiacIcons[z] })) },
               { key: 'birthday', label: t('birthday'), field: 'birthday', type: 'date' },
+              { key: 'birthHour', label: t('birthHour'), field: 'birthHour', dropdown: true,
+                options: hours.map(h => ({ value: h.value, label: h[lang] })) },
               { key: 'phone', label: t('phone'), field: 'phone' },
               { key: 'email', label: t('email'), field: 'email' }
             ].map(item => (
@@ -161,7 +184,7 @@ export default function Profile() {
               {records.slice(0, 10).map((r, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-purple-500/10">
                   <span className="text-sm text-purple-200/80">{typeLabels[r.type] || r.type}</span>
-                  <span className="text-xs text-purple-300/50">{new Date(r.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-purple-300/50">{new Date(r.created_at || r.createdAt).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>

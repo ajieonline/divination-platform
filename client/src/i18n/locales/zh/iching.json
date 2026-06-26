@@ -34,6 +34,7 @@
   "questionPrefix": "所问：",
   "aiTitle": "🤖 AI卦象解读",
   "error": "起卦失败",
+  "networkError": "网络错误，请稍后重试",
   "lineLabel": "爻",
   "categoryOptions": {
     "career": [

@@ -17,8 +17,7 @@ const categories = [
 
 export default function IChing() {
   const { t, i18n } = useTranslation('iching')
-  const tc = useTranslation('common')
-  const { user, token } = useContext(AuthContext)
+  const { token } = useContext(AuthContext)
   const lang = i18n.language?.startsWith('en') ? 'en' : 'zh'
   const [category, setCategory] = useState('career')
   const [question, setQuestion] = useState('')
@@ -39,7 +38,6 @@ export default function IChing() {
         body: JSON.stringify({ question: question || (quickQ[0]) || 'General fortune', category, lang })
       })
       const data = await res.json()
-      console.log('[IChing] API response:', JSON.stringify(data).slice(0, 500))
       if (data.error) {
         alert(data.error)
         setLoading(false)
@@ -47,8 +45,7 @@ export default function IChing() {
       }
       setResult(data)
     } catch (e) {
-      console.error('[IChing] Fetch error:', e)
-      alert('网络错误，请重试')
+      alert(t('networkError'))
     }
     setLoading(false)
   }

@@ -1,5 +1,5 @@
 {
-  "siteName": "天机算命",
+  "siteName": "神秘占卜馆",
   "nav": {
     "home": "首页",
     "tarot": "塔罗占卜",
@@ -8,12 +8,14 @@
     "bazi": "八字命理",
     "iching": "易经卜卦",
     "name": "姓名测试",
-    "sign": "抽签",
+    "sign": "抽签问卦",
     "dream": "AI解梦",
     "vip": "VIP会员",
     "more": "更多",
     "login": "登录",
-    "logout": "退出"
+    "logout": "退出",
+    "openMenu": "打开导航菜单",
+    "closeMenu": "关闭导航菜单"
   },
   "auth": {
     "login": "登录",

@@ -16,6 +16,7 @@
   "gender": "Gender",
   "zodiac": "Zodiac",
   "birthday": "Birthday",
+  "birthHour": "Birth Hour",
   "phone": "Phone",
   "email": "Email",
   "saveProfile": "Save Profile",
@@ -36,8 +37,14 @@
   "recordLabels": {
     "tarot": "🃏 Tarot",
     "eight-characters": "☯️ BaZi",
+    "eight-char": "☯️ BaZi",
     "iching": "📖 I Ching",
     "name": "✍️ Name Test",
-    "sign": "🎋 Lot Draw"
+    "sign": "🎋 Lot Draw",
+    "dream": "💤 AI Dream",
+    "daily": "📅 Daily Fortune",
+    "redeem": "🎁 Points Redeem",
+    "share": "📣 Share Reward",
+    "invite": "🤝 Invite Reward"
   }
 }

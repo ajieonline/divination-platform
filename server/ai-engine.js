@@ -241,12 +241,24 @@ function generateDailyFortune(zodiac) {
   const data = zodiacData[zodiac] || zodiacData['白羊座'];
   const fortunes = ['大吉', '吉', '中吉', '小吉', '平'];
   const luck = fortunes[Math.floor(Math.random() * fortunes.length)];
+  const luckScoreMap = { '大吉': 5, '吉': 4, '中吉': 4, '小吉': 3, '平': 3 };
+  const baseScore = luckScoreMap[luck] || 3;
+  const aspectScore = (offset) => Math.max(1, Math.min(5, baseScore + offset));
   return {
     zodiac, symbol: data.symbol, element: data.element,
-    luck, overall: `${zodiac}今日运势${luck}。${data.personality}的你今天适合关注内心感受。`,
+    luck, luckScore: baseScore,
+    loveScore: aspectScore(0),
+    careerScore: aspectScore(1),
+    wealthScore: aspectScore(-1),
+    healthScore: aspectScore(0),
+    overall: `${zodiac}今日运势${luck}。${data.personality}的你今天适合关注内心感受。`,
     love: `感情方面：${data.love}。今天适合表达真实感受。`,
     career: `事业方面：${data.career}。今天可能有新的机会出现。`,
-    luckyColor: data.luckyColor, luckyNumber: data.luckyNumber
+    wealth: `财富方面：适合稳健规划，先确认现金流与长期目标。`,
+    health: `健康方面：留意作息节奏，给自己安排一段不被打扰的恢复时间。`,
+    luckyColor: data.luckyColor, luckyNumber: data.luckyNumber,
+    luckyDirection: '东方',
+    advice: '把最重要的决定拆成可验证的小步骤，今天更适合稳中求进。'
   };
 }
 

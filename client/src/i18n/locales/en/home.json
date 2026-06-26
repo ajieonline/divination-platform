@@ -1,10 +1,16 @@
 {
   "hero": {
+    "kicker": "AI divination and eastern metaphysics studio",
     "title": "Explore the Mystery of Destiny",
-    "subtitle": "Professional AI Divination · Accurate Reading · Life Guidance",
-    "subtitle2": "Perfect fusion of ancient wisdom and modern AI",
+    "subtitle": "Tarot, horoscope, BaZi, I Ching and AI readings in one focused place, designed to answer the question you are actually asking.",
+    "subtitle2": "Less vague mysticism, more readable guidance you can save and revisit.",
     "startBtn": "🔮 Start Divination",
-    "dailyBtn": "🌟 Today's Fortune"
+    "dailyBtn": "🌟 Today's Fortune",
+    "stats": [
+      { "value": "8", "label": "Core readings" },
+      { "value": "AI", "label": "Personal insight" },
+      { "value": "24h", "label": "Daily refresh" }
+    ]
   },
   "register": {
     "title": "🎉 Register to unlock more features",
@@ -13,6 +19,7 @@
   },
   "features": {
     "title": "🔮 Eight Divination Systems",
+    "subtitle": "From quick card pulls to deeper birth-chart readings, each path starts from a clear question and ends with an easier result to review.",
     "tarot": { "title": "Tarot Reading", "desc": "Classic spread deep reading, reveal destiny guidance" },
     "zodiac": { "title": "Horoscope", "desc": "Daily precise horoscope for 12 zodiac signs" },
     "bazi": { "title": "BaZi Fortune", "desc": "Traditional fortune telling with precise chart" },
@@ -29,6 +36,7 @@
     "yearly": "Yearly ¥199",
     "quarterly": "Quarterly ¥69.9",
     "perDay": "Only",
+    "bestValue": "Most Popular",
     "activate": "Activate Now",
     "activateNow": "🔥 Activate Now"
   },
@@ -36,5 +44,12 @@
     "title": "🌟 Daily Fortune",
     "desc": "Check your personalized daily horoscope analysis",
     "btn": "View Today's Fortune"
+  },
+  "trust": {
+    "items": [
+      { "title": "Focused results", "desc": "Readings are organized around your question, cards, or birth details instead of generic filler." },
+      { "title": "Saved history", "desc": "After login, readings can be stored for later comparison and reflection." },
+      { "title": "Mobile friendly", "desc": "Core readings, forms, and VIP benefits are tuned for quick use on phones." }
+    ]
   }
 }

@@ -4,6 +4,7 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
 const path = require('path');
 
 const engine = require('./ai-engine');
@@ -12,13 +13,15 @@ const PaymentEngine = require('./payment-engine');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'divination-secret-key-2024';
+const DB_PATH = process.env.DB_PATH || '/data/divination.db';
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Database
-const db = new Database('/data/divination.db');
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 const payEngine = new PaymentEngine(db);
 
@@ -51,7 +54,9 @@ db.exec(`
     real_name TEXT,
     gender TEXT,
     zodiac TEXT,
-    birthday TEXT
+    birthday TEXT,
+    birth_hour TEXT,
+    phone TEXT
   );
   CREATE TABLE IF NOT EXISTS admins (
     id TEXT PRIMARY KEY,
@@ -99,6 +104,12 @@ db.exec(`
 // Add missing columns if needed
 try { db.exec("ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN last_checkin TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN real_name TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN gender TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN zodiac TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN birthday TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN birth_hour TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS api_logs (id TEXT PRIMARY KEY, method TEXT, path TEXT, ip TEXT, user_agent TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch(e) {}
 
 // Init default admin
@@ -153,9 +164,9 @@ app.post('/api/auth/login', (req, res) => {
 
 app.get('/api/auth/me', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '未登录' });
-  const user = db.prepare('SELECT id, username, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, email, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour, phone FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: '用户不存在' });
-  res.json({ ...user, isVip: !!user.is_vip });
+  res.json({ ...user, realName: user.real_name, birthHour: user.birth_hour, isVip: !!user.is_vip });
 });
 
 // ========== TAROT ==========
@@ -228,7 +239,7 @@ app.post('/api/zodiac/daily', (req, res) => {
 });
 
 // ========== EIGHT CHARACTERS ==========
-app.post('/api/eight-characters', async (req, res) => {
+app.post('/api/eight-characters', auth, async (req, res) => {
   try {
   const { year, month, day, hour } = req.body;
   if (!year || !month || !day) return res.status(400).json({ error: '请提供出生年月日时' });
@@ -287,7 +298,9 @@ app.post('/api/iching', auth, async (req, res) => {
     `请解读此卦：${hex.name}（${hex.symbol}）\n卦辞：${hex.interpretation}\n爻变信息：${hex.lines.map((l,i) => `${i+1}爻: ${l.type}${l.changing ? '(动爻)' : ''}`).join('、')}\n${userProfileI ? '【求问者信息】\n' + userProfileI : ''}${question ? '所问之事：' + question : ''}\n\n请结合求问者个人特质，给出：1.卦象解析 2.针对所问之事的个性化解读 3.爻变影响 4.针对求问者的具体建议`,
     1000
   );
-  console.log('[IChing] AI result:', aiText ? aiText.slice(0, 100) + '...' : 'null (AI disabled or failed)');
+  if (process.env.DEBUG_AI === '1') {
+    console.log('[IChing] AI result:', aiText ? aiText.slice(0, 100) + '...' : 'null (AI disabled or failed)');
+  }
 
   if (aiText) { hex.aiInterpretation = aiText; hex.reading = aiText; }
 
@@ -426,27 +439,29 @@ app.get('/api/user/points', auth, (req, res) => {
 // ========== USER PROFILE ==========
 app.get('/api/user/profile', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const user = db.prepare('SELECT id, username, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, email, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour, phone FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: '用户不存在' });
-  res.json({ ...user, isVip: !!user.is_vip });
+  res.json({ ...user, realName: user.real_name, birthHour: user.birth_hour, isVip: !!user.is_vip });
 });
 
 app.put('/api/user/profile', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const { nickname, birthday, zodiac, gender, real_name, birth_hour } = req.body;
+  const { nickname, birthday, zodiac, gender, real_name, birth_hour, phone, email } = req.body;
   const updates = [];
   const params = [];
   if (nickname !== undefined) { updates.push('nickname = ?'); params.push(nickname); }
+  if (email !== undefined) { updates.push('email = ?'); params.push(email); }
   if (birthday !== undefined) { updates.push('birthday = ?'); params.push(birthday); }
   if (zodiac !== undefined) { updates.push('zodiac = ?'); params.push(zodiac); }
   if (gender !== undefined) { updates.push('gender = ?'); params.push(gender); }
   if (real_name !== undefined) { updates.push('real_name = ?'); params.push(real_name); }
   if (birth_hour !== undefined) { updates.push('birth_hour = ?'); params.push(birth_hour); }
+  if (phone !== undefined) { updates.push('phone = ?'); params.push(phone); }
   if (updates.length === 0) return res.status(400).json({ error: '没有要更新的字段' });
   params.push(req.user.id);
   db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-  const user = db.prepare('SELECT id, username, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour FROM users WHERE id = ?').get(req.user.id);
-  res.json({ message: '资料已更新', user: { ...user, isVip: !!user.is_vip } });
+  const user = db.prepare('SELECT id, username, email, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour, phone FROM users WHERE id = ?').get(req.user.id);
+  res.json({ message: '资料已更新', user: { ...user, realName: user.real_name, birthHour: user.birth_hour, isVip: !!user.is_vip } });
 });
 
 app.post('/api/user/redeem', auth, (req, res) => {

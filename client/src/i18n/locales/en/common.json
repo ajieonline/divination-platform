@@ -1,5 +1,5 @@
 {
-  "siteName": "MysticDivine",
+  "siteName": "Mystic Divination",
   "nav": {
     "home": "Home",
     "tarot": "Tarot",
@@ -13,7 +13,9 @@
     "vip": "VIP",
     "more": "More",
     "login": "Login",
-    "logout": "Logout"
+    "logout": "Logout",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu"
   },
   "auth": {
     "login": "Login",

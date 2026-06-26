@@ -22,11 +22,22 @@ const zodiacData = [
 
 const elementColors = { fire: 'text-red-400', earth: 'text-green-400', air: 'text-yellow-400', water: 'text-blue-400' }
 const elementLabels = { fire: { zh: '火', en: 'Fire' }, earth: { zh: '土', en: 'Earth' }, air: { zh: '风', en: 'Air' }, water: { zh: '水', en: 'Water' } }
+const luckScoreMap = { '大吉': 5, '吉': 4, '中吉': 4, '小吉': 3, '平': 3 }
+
+const getScore = (value, fallback = 4) => {
+  if (typeof value === 'string' && luckScoreMap[value]) return luckScoreMap[value]
+  const score = Number(value)
+  if (!Number.isFinite(score)) return fallback
+  return Math.max(1, Math.min(5, Math.round(score)))
+}
+
+const getStars = (value, fallback) => '⭐'.repeat(getScore(value, fallback))
+const getText = (value) => typeof value === 'string' && Number.isNaN(Number(value)) ? value : ''
 
 export default function Zodiac() {
   const { t, i18n } = useTranslation('zodiac')
   const tc = useTranslation('common')
-  const { user, token } = useContext(AuthContext)
+  const { token } = useContext(AuthContext)
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -95,16 +106,23 @@ export default function Zodiac() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="bg-purple-900/30 rounded-lg p-3 text-center">
                 <div className="text-purple-300/60 text-xs mb-1">{t('overall')}</div>
-                <div className="text-yellow-400 text-lg">{'⭐'.repeat(result.overall || 5)}</div>
+                <div className="text-yellow-400 text-lg">{getStars(result.luckScore || result.luck, 4)}</div>
+                {result.luck && <div className="text-xs text-amber-200/80 mt-1">{result.luck}</div>}
               </div>
               {[
-                { key: 'love', emoji: '💕' }, { key: 'career', emoji: '💼' },
-                { key: 'wealth', emoji: '💰' }, { key: 'health', emoji: '🏥' }
+                { key: 'love', scoreKey: 'loveScore', emoji: '💕' }, { key: 'career', scoreKey: 'careerScore', emoji: '💼' },
+                { key: 'wealth', scoreKey: 'wealthScore', emoji: '💰' }, { key: 'health', scoreKey: 'healthScore', emoji: '🏥' }
               ].map(item => (
                 <div key={item.key} className="bg-purple-900/30 rounded-lg p-3 text-center">
                   <div className="text-purple-300/60 text-xs mb-1">{t(item.key)}</div>
-                  <div className="text-sm text-purple-100">{item.emoji} {'⭐'.repeat(result[item.key] || 3)}</div>
+                  <div className="text-sm text-purple-100">{item.emoji} {getStars(result[item.scoreKey], 3)}</div>
                 </div>
+              ))}
+            </div>
+
+            <div className="space-y-2 mb-4">
+              {[result.overall, result.love, result.career, result.wealth, result.health].map((text, index) => (
+                getText(text) ? <p key={index} className="text-sm text-purple-100/78 leading-relaxed bg-slate-950/20 rounded-lg px-3 py-2">{text}</p> : null
               ))}
             </div>
 

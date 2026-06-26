@@ -7,11 +7,21 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
 
 const monthIcons = ['❄️','❄️','🌸','🌸','🌿','☀️','☀️','🌺','🍂','🍂','❄️','❄️']
+const luckScoreMap = { '大吉': 5, '吉': 4, '中吉': 4, '小吉': 3, '平': 3 }
+
+const getScore = (value, fallback = 4) => {
+  if (typeof value === 'string' && luckScoreMap[value]) return luckScoreMap[value]
+  const score = Number(value)
+  if (!Number.isFinite(score)) return fallback
+  return Math.max(1, Math.min(5, Math.round(score)))
+}
+
+const getStars = (value, fallback) => '⭐'.repeat(getScore(value, fallback))
+const getText = (value) => typeof value === 'string' && Number.isNaN(Number(value)) ? value : ''
 
 export default function DailyFortune() {
   const { t, i18n } = useTranslation('daily')
-  const tc = useTranslation('common')
-  const { user, token } = useContext(AuthContext)
+  const { token } = useContext(AuthContext)
   const lang = i18n.language?.startsWith('en') ? 'en' : 'zh'
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -76,18 +86,21 @@ export default function DailyFortune() {
 
             <div className="bg-purple-900/30 rounded-lg p-4 mb-4">
               <div className="text-sm text-purple-300/60 mb-2">{t('overallLabel')}</div>
-              <div className="text-yellow-400 text-lg">{'⭐'.repeat(result.overall || 5)}</div>
+              <div className="text-yellow-400 text-lg">{getStars(result.luckScore || result.luck, 4)}</div>
+              {result.luck && <div className="text-xs text-amber-200/80 mt-1">{result.luck}</div>}
+              {getText(result.overall) && <p className="text-sm text-purple-100/80 leading-relaxed mt-3">{result.overall}</p>}
             </div>
 
             <h3 className="text-lg font-bold text-yellow-300 mb-4 text-center">{t('aspectsTitle')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {[
-                { key: 'love', emoji: '💕' }, { key: 'career', emoji: '💼' },
-                { key: 'wealth', emoji: '💰' }, { key: 'health', emoji: '🏥' }
+                { key: 'love', scoreKey: 'loveScore', emoji: '💕' }, { key: 'career', scoreKey: 'careerScore', emoji: '💼' },
+                { key: 'wealth', scoreKey: 'wealthScore', emoji: '💰' }, { key: 'health', scoreKey: 'healthScore', emoji: '🏥' }
               ].map(item => (
                 <div key={item.key} className="bg-purple-900/30 rounded-lg p-3">
                   <div className="text-xs text-purple-300/60 mb-1">{item.emoji} {t(item.key)}</div>
-                  <div className="text-sm text-purple-100">{'⭐'.repeat(result[item.key] || 3)}</div>
+                  <div className="text-sm text-purple-100">{getStars(result[item.scoreKey], 3)}</div>
+                  {getText(result[item.key]) && <p className="text-xs text-purple-200/68 leading-relaxed mt-2">{result[item.key]}</p>}
                 </div>
               ))}
             </div>
