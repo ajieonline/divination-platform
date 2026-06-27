@@ -15,6 +15,17 @@ const featuresData = [
   { to: '/daily', icon: '📅', key: 'daily', color: 'from-amber-600 to-orange-800' }
 ]
 
+const productFeaturesData = [
+  { to: '/zodiac-animal', icon: '卯', title: '生肖运势', desc: '十二生肖年度能量、性格优势与今日行动建议', color: 'from-amber-600 to-red-800' },
+  { to: '/love', icon: '恋', title: '情感占卜', desc: '围绕暧昧、复合、稳定关系给出温和参考', color: 'from-rose-600 to-fuchsia-800' },
+  { to: '/career', icon: '财', title: '事业财运', desc: '拆解职业节奏、财务习惯和近期机会窗口', color: 'from-cyan-600 to-blue-800' },
+  { to: '/reports', icon: '报', title: '深度报告', desc: '解锁情感、事业、年度运势等完整付费报告', color: 'from-yellow-600 to-amber-800' },
+  { to: '/consultants', icon: '师', title: '占卜师咨询', desc: '预约塔罗、情感、事业方向的深度咨询服务', color: 'from-violet-600 to-purple-900' },
+  { to: '/articles', icon: '文', title: '内容资讯', desc: '浏览星象、塔罗和个人成长主题内容', color: 'from-slate-600 to-indigo-800' },
+  { to: '/campaigns', icon: '券', title: '活动专区', desc: '查看节日专题、限时套餐和会员优惠', color: 'from-pink-600 to-orange-700' },
+  { to: '/support', icon: '客', title: '客服反馈', desc: '提交订单、报告、咨询和内容相关问题', color: 'from-emerald-600 to-teal-800' },
+]
+
 const starPoints = Array.from({ length: 44 }, (_, i) => ({
   left: `${(i * 37) % 100}%`,
   top: `${(i * 53) % 100}%`,
@@ -39,7 +50,7 @@ export default function Home() {
     ...f,
     title: t('features.' + f.key + '.title'),
     desc: t('features.' + f.key + '.desc')
-  }))
+  })).concat(productFeaturesData)
 
   const { user } = React.useContext(AuthContext)
   const heroStats = t('hero.stats', { returnObjects: true })

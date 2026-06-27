@@ -14,6 +14,7 @@ import DailyFortune from './pages/DailyFortune'
 import VipCenter from './pages/VipCenter'
 import Profile from './pages/Profile'
 import Admin from './pages/Admin'
+import { Articles, Campaigns, CareerWealth, Consultants, LoveReading, Orders, Reports, Support, ZodiacAnimal } from './pages/ProductExpansion'
 import LanguageSwitcher from './components/LanguageSwitcher'
 
 export const AuthContext = React.createContext()
@@ -41,6 +42,19 @@ function NavBar() {
     { to: '/dream', label: t('nav.dream'), icon: '💭' },
   ]
 
+  const productLinks = [
+    { to: '/zodiac-animal', label: '生肖运势', icon: '卯' },
+    { to: '/love', label: '情感占卜', icon: '恋' },
+    { to: '/career', label: '事业财运', icon: '财' },
+    { to: '/reports', label: '深度报告', icon: '报' },
+    { to: '/consultants', label: '占卜师咨询', icon: '师' },
+    { to: '/articles', label: '内容资讯', icon: '文' },
+    { to: '/campaigns', label: '活动专区', icon: '券' },
+    { to: '/orders', label: '订单中心', icon: '单' },
+    { to: '/support', label: '客服反馈', icon: '客' },
+  ]
+  const allMoreLinks = [...moreLinks, ...productLinks]
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 nav-shell">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
@@ -60,14 +74,14 @@ function NavBar() {
           <div className="relative">
             <button onClick={() => setMoreOpen(!moreOpen)}
               aria-expanded={moreOpen}
-              className={`nav-link ${moreLinks.some(l => isActive(l.to)) ? 'nav-link-active' : ''}`}>
+              className={`nav-link ${allMoreLinks.some(l => isActive(l.to)) ? 'nav-link-active' : ''}`}>
               {t('nav.more')} <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
             </button>
             {moreOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
-                <div className="absolute top-full right-0 mt-2 py-2 rounded-lg z-50 w-44 menu-panel">
-                  {moreLinks.map(l => (
+                <div className="absolute top-full right-0 mt-2 py-2 rounded-lg z-50 w-56 max-h-[70vh] overflow-y-auto menu-panel">
+                  {allMoreLinks.map(l => (
                     <Link key={l.to} to={l.to} onClick={() => setMoreOpen(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-slate-200/80 hover:text-white hover:bg-white/10 transition-all">
                       <span>{l.icon}</span><span>{l.label}</span>
@@ -110,7 +124,7 @@ function NavBar() {
             exit={{ opacity: 0, height: 0 }} className="lg:hidden overflow-hidden menu-panel border-x-0 border-t"
             style={{borderTopColor: 'rgba(217,70,239,0.15)'}}>
             <div className="p-4 space-y-1">
-              {[...links, ...moreLinks].map(l => (
+              {[...links, ...allMoreLinks].map(l => (
                 <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all"
                   style={{
@@ -174,6 +188,15 @@ export default function App() {
                     <Route path="/sign" element={<SignDraw />} />
                     <Route path="/dream" element={<DreamInterpretation />} />
                     <Route path="/daily" element={<DailyFortune />} />
+                    <Route path="/zodiac-animal" element={<ZodiacAnimal />} />
+                    <Route path="/love" element={<LoveReading />} />
+                    <Route path="/career" element={<CareerWealth />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/consultants" element={<Consultants />} />
+                    <Route path="/articles" element={<Articles />} />
+                    <Route path="/campaigns" element={<Campaigns />} />
+                    <Route path="/orders" element={<Orders />} />
+                    <Route path="/support" element={<Support />} />
                     <Route path="/vip" element={<VipCenter />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="*" element={<Home />} />

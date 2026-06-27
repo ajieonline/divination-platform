@@ -205,6 +205,17 @@ db.exec(`
     user_agent TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS feedbacks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    category TEXT NOT NULL,
+    order_no TEXT,
+    contact TEXT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // Add missing columns if needed
@@ -217,6 +228,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN birthday TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN birth_hour TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS api_logs (id TEXT PRIMARY KEY, method TEXT, path TEXT, ip TEXT, user_agent TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch(e) {}
+try { db.exec("CREATE TABLE IF NOT EXISTS feedbacks (id TEXT PRIMARY KEY, user_id TEXT, category TEXT NOT NULL, order_no TEXT, contact TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))"); } catch(e) {}
 
 function cleanString(value, max = 200) {
   if (value === undefined || value === null) return '';
@@ -324,6 +336,14 @@ function adminAuth(req, res, next) {
 }
 
 function genOrderNo() { return 'ORD' + Date.now() + Math.random().toString(36).slice(2, 8).toUpperCase(); }
+
+function saveRecordSafe(userId, type, question, result) {
+  if (!userId) return;
+  try {
+    db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)')
+      .run(uuidv4(), userId, type, question || '', JSON.stringify(result));
+  } catch (e) {}
+}
 
 // ========== AUTH ==========
 app.post('/api/auth/register', authLimiter, (req, res) => {
@@ -620,6 +640,174 @@ app.post('/api/daily-fortune', aiLimiter, async (req, res) => {
   res.json(result);
 });
 
+const zodiacAnimals = [
+  { key: 'rat', name: '鼠', index: 0, element: '水', strengths: ['敏锐直觉', '资源整合', '快速行动'], advice: '把想法落到一张清单里，少做临时决定。' },
+  { key: 'ox', name: '牛', index: 1, element: '土', strengths: ['稳定耐心', '长期主义', '抗压执行'], advice: '坚持节奏的同时，为自己预留调整空间。' },
+  { key: 'tiger', name: '虎', index: 2, element: '木', strengths: ['开拓勇气', '行动魄力', '领导表达'], advice: '重要决定先做一次风险拆解，避免只凭冲劲推进。' },
+  { key: 'rabbit', name: '兔', index: 3, element: '木', strengths: ['关系经营', '审美感知', '温和协调'], advice: '不要为了维持和气而忽略自己的真实边界。' },
+  { key: 'dragon', name: '龙', index: 4, element: '土', strengths: ['格局视野', '影响力', '责任感'], advice: '把宏大目标拆成可验证的小里程碑。' },
+  { key: 'snake', name: '蛇', index: 5, element: '火', strengths: ['洞察策略', '冷静判断', '深度专注'], advice: '适合慢判断、快执行，避免陷入过度推演。' },
+  { key: 'horse', name: '马', index: 6, element: '火', strengths: ['自由热情', '社交活力', '冲刺能力'], advice: '给热情配置明确时间表，成果会更稳定。' },
+  { key: 'goat', name: '羊', index: 7, element: '土', strengths: ['共情力', '创造力', '细腻感受'], advice: '把情绪感受转化成具体表达，关系会更轻松。' },
+  { key: 'monkey', name: '猴', index: 8, element: '金', strengths: ['机智灵活', '快速学习', '问题解决'], advice: '机会很多时，优先选择能沉淀能力的方向。' },
+  { key: 'rooster', name: '鸡', index: 9, element: '金', strengths: ['细节意识', '秩序感', '表达清晰'], advice: '先完成关键事项，再优化细节，会更有推进感。' },
+  { key: 'dog', name: '狗', index: 10, element: '土', strengths: ['忠诚可靠', '责任边界', '信任建设'], advice: '不要把所有责任都揽到自己身上，适度求助。' },
+  { key: 'pig', name: '猪', index: 11, element: '水', strengths: ['包容真诚', '稳定陪伴', '生活感'], advice: '近期适合整理资源和关系，慢慢推进更顺。' },
+];
+
+const publicConsultants = [
+  { id: 'c_luna', symbol: '月', name: '月岚', title: '塔罗与情感关系咨询师', price: 79, duration: 30, rating: 4.9, orders: 1382, tags: ['塔罗牌阵', '情感复盘', '复合沟通'], bio: '擅长把复杂关系拆成情绪、边界和行动三个层面，适合暧昧、复合与稳定关系用户。' },
+  { id: 'c_orion', symbol: '星', name: '星野', title: '星盘与事业节奏顾问', price: 99, duration: 30, rating: 4.8, orders: 976, tags: ['星座运势', '职业选择', '年度规划'], bio: '以星象周期和行动规划结合，帮助用户看清机会窗口、压力来源和职业节奏。' },
+  { id: 'c_yun', symbol: '玄', name: '云衡', title: '八字与个人成长分析师', price: 129, duration: 30, rating: 4.9, orders: 1216, tags: ['八字测算', '成长建议', '事业财运'], bio: '重视合规与现实建议，适合需要长期规划、事业复盘和自我定位的用户。' },
+];
+
+const publicArticles = [
+  {
+    id: 'a_tarot_ritual',
+    category: '塔罗入门',
+    readTime: '4 分钟',
+    title: '一次好的塔罗提问，应该问什么？',
+    excerpt: '塔罗更适合帮助你梳理状态、关系和行动，而不是把未来变成一个确定答案。',
+    content: '### 提问原则\n- 问自己能行动的部分，而不是只问对方会不会改变。\n- 把问题限定在一个清晰周期内，比如最近 30 天。\n- 避免用恐惧驱动问题，先描述真实处境。\n\n### 推荐问题\n你可以尝试问：这段关系现在最需要被看见的阻碍是什么？我接下来可以先做哪一个动作？'
+  },
+  {
+    id: 'a_zodiac_daily',
+    category: '星座运势',
+    readTime: '3 分钟',
+    title: '每日运势应该怎么看，才不会被它牵着走？',
+    excerpt: '把每日运势当作提醒，而不是命令，会更接近它作为陪伴内容的价值。',
+    content: '### 正确使用方式\n- 看关键词，不必执着于每一句话。\n- 把幸运色、幸运数字当作仪式感入口。\n- 更重要的是今天想用什么状态面对生活。\n\n### 平台建议\n如果某条建议让你更放松、更愿意行动，它就是有效的。'
+  },
+  {
+    id: 'a_love_boundary',
+    category: '情感成长',
+    readTime: '5 分钟',
+    title: '关系里的安全感，往往来自清晰边界',
+    excerpt: '情感占卜可以提供视角，但真正让关系变好的，是能被执行的表达和边界。',
+    content: '### 边界不是冷漠\n边界是让彼此知道什么可以继续、什么需要暂停。\n\n### 三个动作\n- 先说事实，再说感受。\n- 用具体请求替代情绪试探。\n- 给对方回应时间，也给自己退出空间。'
+  },
+];
+
+const publicCampaigns = [
+  { id: 'new_year', title: '年度运势启航礼', subtitle: '新一年整体运势、事业、情感和行动建议组合包', period: '长期活动', price: 39.9, original: 79.9, link: '/reports', gradient: 'linear-gradient(135deg, rgba(251,191,36,0.45), rgba(190,24,93,0.35))', includes: ['年度综合报告', '事业财运建议', '情感关系提醒'] },
+  { id: 'love_season', title: '情感关系复盘季', subtitle: '适合暧昧、复合、稳定关系用户的深度解读', period: '限时专题', price: 29.9, original: 59.9, link: '/love', gradient: 'linear-gradient(135deg, rgba(236,72,153,0.45), rgba(124,58,237,0.35))', includes: ['情感占卜', '关系行动清单', '咨询服务优惠'] },
+  { id: 'vip_bundle', title: '会员星光礼遇', subtitle: '会员权益、积分和报告折扣组合', period: '会员专享', price: 69.9, original: 99.9, link: '/vip', gradient: 'linear-gradient(135deg, rgba(20,184,166,0.35), rgba(88,28,135,0.45))', includes: ['季度会员', '积分加成', '报告折扣'] },
+];
+
+function animalByYear(year) {
+  const parsed = Number.parseInt(year, 10);
+  if (!Number.isFinite(parsed) || parsed < 1900 || parsed > 2100) return null;
+  const index = ((parsed - 4) % 12 + 12) % 12;
+  return zodiacAnimals[index];
+}
+
+function getFallbackRelationship(scenario, question) {
+  const scenarioText = { single: '脱单机会', couple: '稳定关系', reunion: '复合判断', choice: '关系选择' }[scenario] || '情感关系';
+  return {
+    title: scenarioText,
+    summary: '这次解读更适合当作一次关系复盘：先看清真实需求，再决定是否推进。',
+    highlights: [
+      { label: '关系关键词', value: '表达、边界、节奏' },
+      { label: '近期建议', value: '少试探，多给出清晰请求' },
+      { label: '风险提醒', value: '避免把不确定感当作结论' },
+    ],
+    reading: `### ${scenarioText}参考\n你提出的问题是：${question}\n\n### 当前能量\n这段关系里最需要被看见的是沟通节奏。你可以先确认自己真正想要的是陪伴、承诺、解释，还是一个更明确的边界。\n\n### 行动建议\n- 先用一句具体表达说出你的感受。\n- 不把对方的沉默直接理解成拒绝或承诺。\n- 给自己设置一个观察周期，再决定是否继续投入。\n\n### 风险提示\n以上内容仅供娱乐参考和个人成长复盘，不代表确定性结果。`
+  };
+}
+
+function getFallbackCareer(focus, question) {
+  const focusText = { career: '事业突破', wealth: '财务规划', side: '副业探索', decision: '重大选择' }[focus] || '事业财运';
+  return {
+    title: focusText,
+    summary: '这次分析更强调节奏、资源和风险管理，而不是预测单一结果。',
+    highlights: [
+      { label: '机会窗口', value: '适合做小规模验证' },
+      { label: '关键能力', value: '聚焦、复盘、持续输出' },
+      { label: '风险提醒', value: '避免冲动消费或高杠杆决策' },
+    ],
+    reading: `### ${focusText}参考\n你关注的问题是：${question}\n\n### 当前节奏\n近期更适合把目标拆成可验证的小任务。比起等待一个明确答案，先完成一次低成本试验，会让后续选择更清楚。\n\n### 行动建议\n- 列出三个可控动作，并在 7 天内完成第一个。\n- 把钱和时间投入到能沉淀能力的方向。\n- 涉及投资、借贷或合同事项时，请咨询专业人士。\n\n### 风险提示\n以上内容仅供娱乐参考和个人成长建议，不构成投资、法律或职业决策承诺。`
+  };
+}
+
+app.get('/api/consultants', (req, res) => {
+  res.json({ consultants: publicConsultants });
+});
+
+app.get('/api/articles', (req, res) => {
+  res.json({ articles: publicArticles });
+});
+
+app.get('/api/campaigns', (req, res) => {
+  res.json({ campaigns: publicCampaigns });
+});
+
+app.post('/api/zodiac-animal', auth, aiLimiter, async (req, res) => {
+  const selected = cleanString(req.body.animal, 40);
+  const profile = animalByYear(req.body.year) || zodiacAnimals.find(item => item.key === selected || item.name === selected);
+  if (!profile) return res.status(400).json({ error: '请提供有效年份或生肖' });
+  const highlights = [
+    { label: '生肖五行', value: profile.element },
+    { label: '优势能量', value: profile.strengths[0] },
+    { label: '今日提醒', value: profile.advice },
+  ];
+  const fallback = `### 生肖${profile.name}运势参考\n你的优势关键词是：${profile.strengths.join('、')}。\n\n### 今日节奏\n适合先稳定自己的节奏，再处理外部变化。不要急着给所有问题下结论，先把最重要的一件事推进。\n\n### 行动建议\n- ${profile.advice}\n- 选择一个可以在今天完成的小动作。\n- 重要关系里，多用清晰表达替代猜测。\n\n以上内容仅供娱乐参考和个人成长建议。`;
+  const aiText = await engine.callAI(
+    '你是一个温和克制的生肖运势内容顾问，输出必须定位为娱乐参考和个人成长建议，不做确定性预测。',
+    `请为生肖${profile.name}生成今日运势参考。优势：${profile.strengths.join('、')}。请包含整体节奏、情感、人际、事业财务、行动建议和合规提示。`,
+    700
+  );
+  const result = { animal: profile.name, key: profile.key, summary: `生肖${profile.name}近期适合围绕“${profile.strengths[0]}”发挥优势。`, highlights, reading: aiText || fallback, timestamp: nowIso() };
+  saveRecordSafe(req.user?.id, 'zodiac-animal', profile.name, result);
+  res.json(result);
+});
+
+app.post('/api/relationship', auth, aiLimiter, async (req, res) => {
+  const scenario = cleanString(req.body.scenario, 40) || 'single';
+  const question = cleanString(req.body.question, 800);
+  if (!question) return res.status(400).json({ error: '请填写情感问题' });
+  const fallback = getFallbackRelationship(scenario, question);
+  const aiText = await engine.callAI(
+    '你是一个情感占卜与关系复盘顾问。输出必须温和、克制、非绝对化，不能制造焦虑，遇到暴力、自伤等高风险内容要建议寻求专业帮助。',
+    `场景：${fallback.title}\n用户问题：${question}\n请输出：1. 当前关系能量 2. 真实需求 3. 对方可能的压力点 4. 用户可执行的沟通建议 5. 风险提示。`,
+    900
+  );
+  const result = { ...fallback, reading: aiText || fallback.reading, timestamp: nowIso() };
+  saveRecordSafe(req.user?.id, 'relationship', question, result);
+  res.json(result);
+});
+
+app.post('/api/career-wealth', auth, aiLimiter, async (req, res) => {
+  const focus = cleanString(req.body.focus, 40) || 'career';
+  const profile = cleanString(req.body.profile, 200);
+  const question = cleanString(req.body.question, 800);
+  if (!question) return res.status(400).json({ error: '请填写事业或财务问题' });
+  const fallback = getFallbackCareer(focus, question);
+  const aiText = await engine.callAI(
+    '你是一个事业财运分析顾问。输出必须定位为娱乐参考和个人成长建议，不提供股票、博彩、借贷、投资买卖指令。',
+    `关注方向：${fallback.title}\n当前状态：${profile || '未填写'}\n用户问题：${question}\n请输出：1. 当前节奏 2. 机会窗口 3. 风险提醒 4. 7天行动清单 5. 合规提示。`,
+    900
+  );
+  const result = { ...fallback, reading: aiText || fallback.reading, timestamp: nowIso() };
+  saveRecordSafe(req.user?.id, 'career-wealth', question, result);
+  res.json(result);
+});
+
+app.post('/api/feedback', auth, (req, res) => {
+  const category = cleanString(req.body.category, 40) || 'general';
+  const orderNo = cleanString(req.body.orderNo, 80);
+  const contact = cleanString(req.body.contact, 120);
+  const message = cleanString(req.body.message, 1200);
+  if (!message) return res.status(400).json({ error: '请填写反馈内容' });
+  if (orderNo && req.user) {
+    const order = db.prepare('SELECT user_id FROM orders WHERE order_no = ?').get(orderNo);
+    if (order && order.user_id !== req.user.id) return res.status(403).json({ error: '不能反馈不属于你的订单' });
+  }
+  const id = uuidv4();
+  db.prepare('INSERT INTO feedbacks (id, user_id, category, order_no, contact, message) VALUES (?,?,?,?,?,?)')
+    .run(id, req.user?.id || null, category, orderNo || null, contact || null, message);
+  res.json({ success: true, id });
+});
+
 // ========== USER ==========
 app.post('/api/user/checkin', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
@@ -767,7 +955,7 @@ app.get('/api/records', auth, (req, res) => {
 
 app.post('/api/records', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const allowedRecordTypes = new Set(['tarot', 'eight-char', 'iching', 'name', 'sign', 'dream', 'daily', 'redeem', 'share', 'invite', 'first_divination']);
+  const allowedRecordTypes = new Set(['tarot', 'eight-char', 'iching', 'name', 'sign', 'dream', 'daily', 'zodiac-animal', 'relationship', 'career-wealth', 'report', 'redeem', 'share', 'invite', 'first_divination']);
   const type = cleanString(req.body.type, 40);
   const question = cleanString(req.body.question, 500);
   const result = req.body.result;
@@ -790,6 +978,29 @@ const productCatalog = {
   vip_quarter: { name: 'VIP季卡', amount: 69.9 },
   vip_year: { name: 'VIP年卡', amount: 199 },
 };
+
+Object.assign(productCatalog, {
+  report_love: { name: '情感关系深度报告', amount: 19.9 },
+  report_career: { name: '事业财运行动报告', amount: 29.9 },
+  report_year: { name: '年度综合运势报告', amount: 39.9 },
+  consult_30: { name: '占卜师30分钟咨询', amount: 79 },
+});
+
+const reportCatalog = [
+  { product: 'report_love', category: '情感关系', name: '情感关系深度报告', desc: '适合暧昧、复合、稳定关系和关系选择场景，包含需求拆解、沟通建议和行动清单。', amount: productCatalog.report_love.amount, original: 39.9, badge: '高转化', sections: ['关系能量摘要', '真实需求分析', '沟通行动清单', '7天复盘建议'] },
+  { product: 'report_career', category: '事业财运', name: '事业财运行动报告', desc: '围绕职业节奏、机会窗口、财务习惯和风险提醒，给出更清晰的执行路径。', amount: productCatalog.report_career.amount, original: 59.9, badge: '推荐', sections: ['职业节奏判断', '机会与风险', '财务习惯建议', '30天行动计划'] },
+  { product: 'report_year', category: '年度运势', name: '年度综合运势报告', desc: '覆盖年度主题、情感、事业、财运、个人成长和关键月份提醒。', amount: productCatalog.report_year.amount, original: 99.9, badge: '年度礼遇', sections: ['年度关键词', '四大维度运势', '关键月份提醒', '个人成长建议'] },
+];
+
+app.get('/api/products/reports', (req, res) => {
+  res.json({ reports: reportCatalog });
+});
+
+app.get('/api/orders', auth, (req, res) => {
+  if (!req.user) return res.status(401).json({ error: '璇峰厛鐧诲綍' });
+  const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 100').all(req.user.id);
+  res.json({ orders: orders.map(order => ({ ...order, productName: productCatalog[order.product]?.name || order.product })) });
+});
 
 app.post('/api/pay/create', auth, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
@@ -966,6 +1177,31 @@ app.get('/api/admin/records', adminAuth, (req, res) => {
 
 app.delete('/api/admin/records/:id', adminAuth, (req, res) => {
   db.prepare('DELETE FROM records WHERE id = ?').run(req.params.id);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/content', adminAuth, (req, res) => {
+  res.json({
+    reports: reportCatalog,
+    consultants: publicConsultants,
+    articles: publicArticles,
+    campaigns: publicCampaigns,
+  });
+});
+
+app.get('/api/admin/feedback', adminAuth, (req, res) => {
+  const status = cleanString(req.query.status, 20);
+  let where = 'WHERE 1=1';
+  const params = [];
+  if (status) { where += ' AND f.status = ?'; params.push(status); }
+  const feedbacks = db.prepare(`SELECT f.*, u.username FROM feedbacks f LEFT JOIN users u ON f.user_id = u.id ${where} ORDER BY f.created_at DESC LIMIT 100`).all(...params);
+  res.json({ feedbacks });
+});
+
+app.put('/api/admin/feedback/:id/status', adminAuth, (req, res) => {
+  const status = cleanString(req.body.status, 20);
+  if (!['open', 'processing', 'closed'].includes(status)) return res.status(400).json({ error: '状态不支持' });
+  db.prepare('UPDATE feedbacks SET status = ? WHERE id = ?').run(status, req.params.id);
   res.json({ success: true });
 });
 

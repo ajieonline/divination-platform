@@ -335,6 +335,133 @@ function RecordManagement() {
   )
 }
 
+function OrderManagement() {
+  const [data, setData] = useState({ orders: [], total: 0 })
+  const [status, setStatus] = useState('')
+  const load = () => api(`/orders?status=${status}`).then(setData)
+  useEffect(() => { load() }, [status])
+  const statusNames = { pending: '待支付', paid: '已支付', expired: '已过期', refunded: '已退款' }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {['', 'pending', 'paid', 'expired', 'refunded'].map(item => (
+          <button key={item || 'all'} onClick={() => setStatus(item)}
+            className="px-3 py-1.5 rounded-lg text-sm transition-all"
+            style={{background: status === item ? 'linear-gradient(135deg, #a21caf, #7c3aed)' : 'rgba(30,15,60,0.6)', border: `1px solid ${status === item ? 'rgba(217,70,239,0.6)' : 'rgba(217,70,239,0.2)'}`, color: status === item ? 'white' : 'rgba(196,181,253,0.8)'}}>
+            {item ? statusNames[item] : '全部订单'}
+          </button>
+        ))}
+      </div>
+      <div className="card-glass overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-white/10">
+            <th className="text-left p-3 text-purple-300/60 font-normal">订单号</th>
+            <th className="text-left p-3 text-purple-300/60 font-normal">用户</th>
+            <th className="text-left p-3 text-purple-300/60 font-normal">商品</th>
+            <th className="text-right p-3 text-purple-300/60 font-normal">金额</th>
+            <th className="text-center p-3 text-purple-300/60 font-normal">状态</th>
+            <th className="text-left p-3 text-purple-300/60 font-normal">时间</th>
+          </tr></thead>
+          <tbody>
+            {(data.orders || []).map(order => (
+              <tr key={order.id} className="border-b border-white/5 hover:bg-white/5">
+                <td className="p-3 text-purple-200 font-mono text-xs">{order.order_no}</td>
+                <td className="p-3 text-purple-200/80">{order.username || '-'}</td>
+                <td className="p-3 text-purple-200/80">{order.product}</td>
+                <td className="p-3 text-right text-yellow-300">¥{order.amount}</td>
+                <td className="p-3 text-center"><span className="px-2 py-1 rounded bg-white/5 text-purple-100/70 text-xs">{statusNames[order.status] || order.status}</span></td>
+                <td className="p-3 text-purple-300/50 text-xs">{new Date(order.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ContentOperations() {
+  const [data, setData] = useState({ reports: [], consultants: [], articles: [], campaigns: [] })
+  useEffect(() => { api('/content').then(setData) }, [])
+  const groups = [
+    { key: 'reports', title: '付费报告', desc: '报告商品、价格、目录和转化入口', items: data.reports || [] },
+    { key: 'consultants', title: '占卜师', desc: '咨询师资料、标签、价格和服务能力', items: data.consultants || [] },
+    { key: 'articles', title: '内容资讯', desc: '星座、塔罗、情感和成长内容', items: data.articles || [] },
+    { key: 'campaigns', title: '活动专区', desc: '节日专题、限时套餐和会员活动', items: data.campaigns || [] },
+  ]
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {groups.map(group => <StatCard key={group.key} icon="✦" label={group.title} value={group.items.length} sub={group.desc} color="#fbbf24" />)}
+      </div>
+      {groups.map(group => (
+        <div key={group.key} className="card-glass p-6">
+          <h3 className="text-yellow-300 font-bold mb-4">{group.title}</h3>
+          <div className="grid md:grid-cols-3 gap-3">
+            {group.items.map((item, i) => (
+              <div key={item.id || item.product || item.name || i} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="font-bold text-purple-100">{item.name || item.title}</div>
+                <div className="text-xs text-purple-300/50 mt-2 line-clamp-3">{item.desc || item.bio || item.excerpt || item.subtitle}</div>
+                {(item.amount || item.price) && <div className="text-sm text-yellow-300 mt-3">¥{item.amount || item.price}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FeedbackManagement() {
+  const [data, setData] = useState({ feedbacks: [] })
+  const [status, setStatus] = useState('')
+  const load = () => api(`/feedback?status=${status}`).then(setData)
+  useEffect(() => { load() }, [status])
+  const updateStatus = async (id, nextStatus) => {
+    await api(`/feedback/${id}/status`, { method: 'PUT', body: JSON.stringify({ status: nextStatus }) })
+    load()
+  }
+  const statusNames = { open: '待处理', processing: '处理中', closed: '已关闭' }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {['', 'open', 'processing', 'closed'].map(item => (
+          <button key={item || 'all'} onClick={() => setStatus(item)}
+            className="px-3 py-1.5 rounded-lg text-sm transition-all"
+            style={{background: status === item ? 'linear-gradient(135deg, #a21caf, #7c3aed)' : 'rgba(30,15,60,0.6)', border: `1px solid ${status === item ? 'rgba(217,70,239,0.6)' : 'rgba(217,70,239,0.2)'}`, color: status === item ? 'white' : 'rgba(196,181,253,0.8)'}}>
+            {item ? statusNames[item] : '全部反馈'}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-3">
+        {(data.feedbacks || []).map(item => (
+          <div key={item.id} className="card-glass p-4 rounded-xl">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-purple-300/50 mb-2">
+                  <span>{item.category}</span><span>|</span><span>{item.username || '游客'}</span>{item.order_no && <><span>|</span><span>{item.order_no}</span></>}
+                </div>
+                <p className="text-sm text-purple-100/80 leading-relaxed">{item.message}</p>
+                {item.contact && <p className="text-xs text-purple-300/45 mt-2">联系方式：{item.contact}</p>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {['open', 'processing', 'closed'].map(next => (
+                  <button key={next} onClick={() => updateStatus(item.id, next)}
+                    className={`px-2 py-1 rounded text-xs ${item.status === next ? 'bg-yellow-300/20 text-yellow-200' : 'bg-white/5 text-purple-300/60 hover:text-white'}`}>
+                    {statusNames[next]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="text-xs text-purple-300/35 mt-3">{new Date(item.created_at).toLocaleString()}</div>
+          </div>
+        ))}
+        {(data.feedbacks || []).length === 0 && <div className="card-glass p-6 rounded-xl text-center text-purple-300/50">暂无反馈</div>}
+      </div>
+    </div>
+  )
+}
+
 function SettingsPanel() {
   const { t } = useTranslation('admin')
   const [settings, setSettings] = useState({})
@@ -492,12 +619,21 @@ export default function Admin() {
     { key: 'payment', label: t('sidebar.payment'), icon: '💳' },
   ]
 
+  tabs.splice(4, 0,
+    { key: 'orders', label: '订单管理', icon: '单' },
+    { key: 'content', label: '内容运营', icon: '文' },
+    { key: 'feedback', label: '反馈工单', icon: '客' },
+  )
+
   const render = () => {
     switch(tab) {
       case 'dashboard': return <Dashboard stats={stats} />
       case 'traffic': return <TrafficStats stats={stats} />
       case 'users': return <UserManagement />
       case 'records': return <RecordManagement />
+      case 'orders': return <OrderManagement />
+      case 'content': return <ContentOperations />
+      case 'feedback': return <FeedbackManagement />
       case 'ai': return <AIConfig />
       case 'settings': return <SettingsPanel />
       case 'payment': return <PaymentConfig />
