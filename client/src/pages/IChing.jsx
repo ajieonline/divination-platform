@@ -5,6 +5,8 @@ import { AuthContext } from '../App'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload, readApiJson } from '../utils/api'
 
 const categories = [
   { value: 'career', icon: '💼' },
@@ -17,12 +19,13 @@ const categories = [
 
 export default function IChing() {
   const { t, i18n } = useTranslation('iching')
-  const { token } = useContext(AuthContext)
+  const { user, token } = useContext(AuthContext)
   const lang = i18n.language?.startsWith('en') ? 'en' : 'zh'
   const [category, setCategory] = useState('career')
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const catLabels = t('questionTypes', { returnObjects: true })
   const catOptions = t('categoryOptions', { returnObjects: true })
@@ -31,21 +34,20 @@ export default function IChing() {
 
   const doDivination = async () => {
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/iching', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ question: question || (quickQ[0]) || 'General fortune', category, lang })
       })
-      const data = await res.json()
-      if (data.error) {
-        alert(data.error)
-        setLoading(false)
-        return
-      }
+      const data = await readApiJson(res)
       setResult(data)
-    } catch (e) {
-      alert(t('networkError'))
+    } catch (err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || t('networkError'))
     }
     setLoading(false)
   }
@@ -86,6 +88,7 @@ export default function IChing() {
               {t('startDivination')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">

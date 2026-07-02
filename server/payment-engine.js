@@ -44,6 +44,15 @@ class PaymentEngine {
     tx();
   }
 
+  grantSingleReportCredit(order) {
+    if (!order || order.product !== 'single_report' || !order.user_id) return;
+    const existing = this.db.prepare('SELECT id FROM usage_unlocks WHERE order_id = ?').get(order.id);
+    if (existing) return;
+    this.db.prepare(
+      'INSERT INTO usage_unlocks (id, user_id, order_id, product, remaining) VALUES (?,?,?,?,?)'
+    ).run(crypto.randomUUID(), order.user_id, order.id, order.product, 1);
+  }
+
   // ========== 微信支付 ==========
 
   // 生成微信支付预付单（Native支付 - 二维码）
@@ -134,6 +143,7 @@ class PaymentEngine {
       const expire = new Date(Date.now() + vipDays * 86400000).toISOString();
       this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
     }
+    this.grantSingleReportCredit(order);
   }
 
   // ========== 支付宝 ==========
@@ -225,6 +235,7 @@ class PaymentEngine {
       const expire = new Date(Date.now() + vipDays * 86400000).toISOString();
       this.db.prepare('UPDATE users SET is_vip = 1, vip_expire = ? WHERE id = ?').run(expire, order.user_id);
     }
+    this.grantSingleReportCredit(order);
   }
 
   // ========== 状态查询 ==========

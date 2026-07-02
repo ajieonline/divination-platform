@@ -5,6 +5,8 @@ import { AuthContext } from '../App'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload, readApiJson } from '../utils/api'
 
 const dreamCategories = [
   { value: 'nature', icon: '🌊', keywords: ['water','fire','rain','snow','wind','thunder','eclipse','rainbow','earthquake'] },
@@ -33,6 +35,7 @@ export default function DreamInterpretation() {
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const catLabels = t('categories', { returnObjects: true })
   const currentKeywords = lang === 'en'
@@ -42,15 +45,21 @@ export default function DreamInterpretation() {
   const doInterpret = async () => {
     if (!keyword.trim()) { alert(t('error')); return }
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/dream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ keyword: keyword.trim(), lang })
       })
-      const data = await res.json()
+      const data = await readApiJson(res)
       setResult(data)
-    } catch (e) {}
+    } catch (err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || tc.t('common.error'))
+    }
     setLoading(false)
   }
 
@@ -91,6 +100,7 @@ export default function DreamInterpretation() {
               {t('startInterpret')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">

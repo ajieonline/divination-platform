@@ -5,6 +5,8 @@ import { AuthContext } from '../App'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload, readApiJson } from '../utils/api'
 
 const quickYears = [
   { year: 2000, desc: { zh: '千禧龙年', en: 'Millennium Dragon' } },
@@ -33,6 +35,7 @@ export default function EightChar() {
   const [form, setForm] = useState({ year: '', month: '', day: '', hour: '' })
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const setField = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
@@ -44,15 +47,21 @@ export default function EightChar() {
   const doAnalysis = async () => {
     if (!form.year || !form.month || !form.day) { alert(t('pleaseSelect')); return }
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/eight-characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ year: form.year, month: form.month, day: form.day, hour: form.hour || undefined, lang })
       })
-      const data = await res.json()
+      const data = await readApiJson(res)
       setResult(data)
-    } catch (e) {}
+    } catch (err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || tc.t('common.error'))
+    }
     setLoading(false)
   }
 
@@ -99,6 +108,7 @@ export default function EightChar() {
               {t('startBtn')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} />
       </div>
 
       {result && (

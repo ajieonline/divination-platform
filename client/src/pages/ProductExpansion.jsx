@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { AuthContext } from '../App'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload } from '../utils/api'
 
 const animalOptions = [
   { key: 'rat', name: '鼠', years: '1960 / 1972 / 1984 / 1996 / 2008 / 2020', tone: '敏锐、机变、善于发现机会' },
@@ -42,7 +44,12 @@ function authHeaders(token) {
 
 async function readJson(res) {
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || '请求失败')
+  if (!res.ok) {
+    const error = new Error(data.error || '请求失败')
+    error.status = res.status
+    error.payload = data
+    throw error
+  }
   return data
 }
 
@@ -104,15 +111,18 @@ function LoadingButton({ loading, children, ...props }) {
 }
 
 export function ZodiacAnimal() {
-  const { token } = useContext(AuthContext)
+  const { user, token } = useContext(AuthContext)
   const [year, setYear] = useState('1990')
   const [animal, setAnimal] = useState('horse')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
   const selected = animalOptions.find(item => item.key === animal)
 
   const submit = async () => {
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const data = await fetch('/api/zodiac-animal', {
         method: 'POST',
@@ -121,7 +131,9 @@ export function ZodiacAnimal() {
       }).then(readJson)
       setResult(data)
     } catch (err) {
-      alert(err.message)
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message)
     }
     setLoading(false)
   }
@@ -147,6 +159,7 @@ export function ZodiacAnimal() {
             </div>
           </div>
           <LoadingButton loading={loading} onClick={submit} className="btn-gold w-full">查看生肖运势</LoadingButton>
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </div>
         <div className="space-y-4">
           {selected && (
@@ -165,15 +178,18 @@ export function ZodiacAnimal() {
 }
 
 export function LoveReading() {
-  const { token } = useContext(AuthContext)
+  const { user, token } = useContext(AuthContext)
   const [scenario, setScenario] = useState('single')
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const submit = async () => {
     if (!question.trim()) return alert('请先写下你最想确认的情感问题')
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const data = await fetch('/api/relationship', {
         method: 'POST',
@@ -182,7 +198,9 @@ export function LoveReading() {
       }).then(readJson)
       setResult(data)
     } catch (err) {
-      alert(err.message)
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message)
     }
     setLoading(false)
   }
@@ -203,6 +221,7 @@ export function LoveReading() {
           </div>
           <textarea className="input-mystic w-full h-32" value={question} onChange={e => setQuestion(e.target.value)} placeholder="例如：我们最近沟通变少了，这段关系接下来应该怎么推进？" />
           <LoadingButton loading={loading} onClick={submit} className="btn-mystic w-full">生成情感解读</LoadingButton>
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </div>
         <ResultPanel title="情感关系解读" result={result} />
       </div>
@@ -211,16 +230,19 @@ export function LoveReading() {
 }
 
 export function CareerWealth() {
-  const { token } = useContext(AuthContext)
+  const { user, token } = useContext(AuthContext)
   const [focus, setFocus] = useState('career')
   const [profile, setProfile] = useState('')
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const submit = async () => {
     if (!question.trim()) return alert('请写下你当前最关注的事业或财务问题')
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const data = await fetch('/api/career-wealth', {
         method: 'POST',
@@ -229,7 +251,9 @@ export function CareerWealth() {
       }).then(readJson)
       setResult(data)
     } catch (err) {
-      alert(err.message)
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message)
     }
     setLoading(false)
   }
@@ -251,6 +275,7 @@ export function CareerWealth() {
           <input className="input-mystic w-full" value={profile} onChange={e => setProfile(e.target.value)} placeholder="当前状态：例如在职、转岗、创业、学生等" />
           <textarea className="input-mystic w-full h-32" value={question} onChange={e => setQuestion(e.target.value)} placeholder="例如：我是否应该在今年换工作？应该重点准备什么？" />
           <LoadingButton loading={loading} onClick={submit} className="btn-gold w-full">生成事业财运建议</LoadingButton>
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </div>
         <ResultPanel title="事业财运分析" result={result} />
       </div>

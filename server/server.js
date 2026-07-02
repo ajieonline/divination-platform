@@ -216,6 +216,27 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+  CREATE TABLE IF NOT EXISTS usage_events (
+    id TEXT PRIMARY KEY,
+    subject_type TEXT NOT NULL,
+    subject_key TEXT NOT NULL,
+    user_id TEXT,
+    visitor_id TEXT,
+    divination_type TEXT NOT NULL,
+    source TEXT DEFAULT 'free',
+    unlock_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS usage_unlocks (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    order_id TEXT UNIQUE,
+    product TEXT NOT NULL,
+    remaining INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // Add missing columns if needed
@@ -229,6 +250,10 @@ try { db.exec("ALTER TABLE users ADD COLUMN birth_hour TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS api_logs (id TEXT PRIMARY KEY, method TEXT, path TEXT, ip TEXT, user_agent TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"); } catch(e) {}
 try { db.exec("CREATE TABLE IF NOT EXISTS feedbacks (id TEXT PRIMARY KEY, user_id TEXT, category TEXT NOT NULL, order_no TEXT, contact TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))"); } catch(e) {}
+try { db.exec("CREATE TABLE IF NOT EXISTS usage_events (id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_key TEXT NOT NULL, user_id TEXT, visitor_id TEXT, divination_type TEXT NOT NULL, source TEXT DEFAULT 'free', unlock_id TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))"); } catch(e) {}
+try { db.exec("CREATE TABLE IF NOT EXISTS usage_unlocks (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, order_id TEXT UNIQUE, product TEXT NOT NULL, remaining INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id))"); } catch(e) {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_usage_events_subject ON usage_events(subject_type, subject_key, source, created_at)"); } catch(e) {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_usage_unlocks_user ON usage_unlocks(user_id, remaining, created_at)"); } catch(e) {}
 
 function cleanString(value, max = 200) {
   if (value === undefined || value === null) return '';
@@ -345,6 +370,214 @@ function saveRecordSafe(userId, type, question, result) {
   } catch (e) {}
 }
 
+const ANON_FREE_TEST_LIMIT = 1;
+const USER_FREE_TEST_LIMIT = 3;
+const SINGLE_REPORT_PRODUCT = { product: 'single_report', name: '单次综合测试报告', amount: 5 };
+
+function parseCookies(header = '') {
+  return String(header || '').split(';').reduce((acc, part) => {
+    const index = part.indexOf('=');
+    if (index === -1) return acc;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (!key) return acc;
+    try {
+      acc[key] = decodeURIComponent(value);
+    } catch (e) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+function getOrCreateVisitorId(req, res) {
+  const cookies = parseCookies(req.headers.cookie);
+  let visitorId = cookies.visitor_id;
+  if (!/^v_[a-f0-9-]{20,}$/i.test(visitorId || '')) {
+    visitorId = `v_${uuidv4()}`;
+    res.cookie('visitor_id', visitorId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+    });
+  }
+  return visitorId;
+}
+
+function isActiveVip(user) {
+  if (!user || !user.is_vip) return false;
+  if (!user.vip_expire) return true;
+  const expireAt = new Date(user.vip_expire).getTime();
+  return Number.isFinite(expireAt) && expireAt > Date.now();
+}
+
+function getUsageSubject(req, res) {
+  if (req.user?.id) {
+    const user = db.prepare('SELECT id, username, is_vip, vip_expire FROM users WHERE id = ?').get(req.user.id);
+    if (user) {
+      return {
+        type: 'user',
+        key: user.id,
+        user,
+        isVip: isActiveVip(user),
+        limit: USER_FREE_TEST_LIMIT,
+      };
+    }
+  }
+  const visitorId = getOrCreateVisitorId(req, res);
+  return {
+    type: 'visitor',
+    key: visitorId,
+    visitorId,
+    user: null,
+    isVip: false,
+    limit: ANON_FREE_TEST_LIMIT,
+  };
+}
+
+function countFreeUsage(subject) {
+  const row = db.prepare(
+    "SELECT COUNT(*) AS c FROM usage_events WHERE subject_type = ? AND subject_key = ? AND source = 'free'"
+  ).get(subject.type, subject.key);
+  return row?.c || 0;
+}
+
+function countPaidCredits(userId) {
+  if (!userId) return 0;
+  const row = db.prepare('SELECT COALESCE(SUM(remaining), 0) AS c FROM usage_unlocks WHERE user_id = ?').get(userId);
+  return row?.c || 0;
+}
+
+function logUsageEvent(subject, divinationType, source, unlockId = null) {
+  db.prepare(
+    'INSERT INTO usage_events (id, subject_type, subject_key, user_id, visitor_id, divination_type, source, unlock_id) VALUES (?,?,?,?,?,?,?,?)'
+  ).run(
+    uuidv4(),
+    subject.type,
+    subject.key,
+    subject.user?.id || null,
+    subject.visitorId || null,
+    divinationType,
+    source,
+    unlockId
+  );
+}
+
+function consumePaidUnlock(userId) {
+  if (!userId) return null;
+  const unlock = db.prepare(
+    'SELECT id, remaining FROM usage_unlocks WHERE user_id = ? AND remaining > 0 ORDER BY created_at ASC LIMIT 1'
+  ).get(userId);
+  if (!unlock) return null;
+  db.prepare('UPDATE usage_unlocks SET remaining = remaining - 1 WHERE id = ?').run(unlock.id);
+  return unlock;
+}
+
+function quotaPayload(subject, used, limit) {
+  const loggedIn = !!subject.user;
+  return {
+    error: loggedIn
+      ? '免费测算次数已用完。普通用户可免费测 3 次，开通会员后不限次免费，也可以购买一次单次综合测试报告。'
+      : '游客免费测算次数已用完。游客仅可免费测 1 次，登录后普通用户可免费测 3 次，也可以购买单次综合测试报告。',
+    code: 'TEST_QUOTA_EXCEEDED',
+    paymentRequired: true,
+    quota: {
+      allowed: false,
+      subjectType: subject.type,
+      isVip: subject.isVip,
+      used,
+      limit,
+      remaining: 0,
+      paidCreditsRemaining: countPaidCredits(subject.user?.id),
+    },
+    product: SINGLE_REPORT_PRODUCT,
+    memberFree: true,
+    actions: {
+      loginRequiredForPurchase: !loggedIn,
+      vipPath: '/vip',
+      loginPath: '/profile',
+    },
+  };
+}
+
+function consumeDivinationQuota(req, res, divinationType) {
+  const subject = getUsageSubject(req, res);
+
+  if (subject.isVip) {
+    logUsageEvent(subject, divinationType, 'vip');
+    return {
+      ok: true,
+      usage: {
+        allowed: true,
+        source: 'vip',
+        subjectType: subject.type,
+        isVip: true,
+        used: null,
+        limit: null,
+        remaining: null,
+        paidCreditsRemaining: countPaidCredits(subject.user?.id),
+      },
+    };
+  }
+
+  const used = countFreeUsage(subject);
+  if (used < subject.limit) {
+    logUsageEvent(subject, divinationType, 'free');
+    const nextUsed = used + 1;
+    return {
+      ok: true,
+      usage: {
+        allowed: true,
+        source: 'free',
+        subjectType: subject.type,
+        isVip: false,
+        used: nextUsed,
+        limit: subject.limit,
+        remaining: Math.max(subject.limit - nextUsed, 0),
+        paidCreditsRemaining: countPaidCredits(subject.user?.id),
+      },
+    };
+  }
+
+  const paidUnlock = consumePaidUnlock(subject.user?.id);
+  if (paidUnlock) {
+    logUsageEvent(subject, divinationType, 'paid', paidUnlock.id);
+    return {
+      ok: true,
+      usage: {
+        allowed: true,
+        source: 'paid',
+        subjectType: subject.type,
+        isVip: false,
+        used,
+        limit: subject.limit,
+        remaining: 0,
+        paidCreditsRemaining: countPaidCredits(subject.user?.id),
+      },
+    };
+  }
+
+  return { ok: false, status: 402, payload: quotaPayload(subject, used, subject.limit) };
+}
+
+function sendQuotaBlocked(res, gate) {
+  return res.status(gate.status || 402).json(gate.payload);
+}
+
+function withUsage(payload, gate) {
+  return {
+    ...payload,
+    usage: gate?.usage || null,
+    monetization: {
+      singleReport: SINGLE_REPORT_PRODUCT,
+      memberFree: true,
+      anonymousFreeLimit: ANON_FREE_TEST_LIMIT,
+      userFreeLimit: USER_FREE_TEST_LIMIT,
+    },
+  };
+}
+
 // ========== AUTH ==========
 app.post('/api/auth/register', authLimiter, (req, res) => {
   const username = cleanString(req.body.username, 32);
@@ -369,33 +602,21 @@ app.post('/api/auth/login', authLimiter, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ error: '账号或密码错误' });
   const token = signUserToken(user);
-  res.json({ token, user: { id: user.id, username: user.username, nickname: user.nickname, isVip: !!user.is_vip } });
+  res.json({ token, user: { id: user.id, username: user.username, nickname: user.nickname, isVip: isActiveVip(user) } });
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '未登录' });
-  const user = db.prepare('SELECT id, username, email, nickname, is_vip, points, birthday, zodiac, gender, real_name, birth_hour, phone FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, username, email, nickname, is_vip, vip_expire, points, birthday, zodiac, gender, real_name, birth_hour, phone FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: '用户不存在' });
-  res.json({ ...user, realName: user.real_name, birthHour: user.birth_hour, isVip: !!user.is_vip });
+  res.json({ ...user, realName: user.real_name, birthHour: user.birth_hour, isVip: isActiveVip(user) });
 });
 
 // ========== TAROT ==========
 app.post('/api/tarot/draw', aiLimiter, auth, async (req, res) => {
   const { spread, question } = req.body;
-  // VIP check: free users limited to 'single' spread, once per day
-  if (req.user) {
-    const userInfo = db.prepare('SELECT is_vip FROM users WHERE id = ?').get(req.user.id);
-    if (!userInfo || !userInfo.is_vip) {
-      if (spread !== 'single') {
-        return res.status(403).json({ error: '免费用户仅可使用单牌占卜，开通VIP解锁全部牌阵' });
-      }
-      const today = new Date().toISOString().split('T')[0];
-      const todayCount = db.prepare("SELECT COUNT(*) as c FROM records WHERE user_id = ? AND type = 'tarot' AND date(created_at) = ?").get(req.user.id, today);
-      if (todayCount && todayCount.c >= 1) {
-        return res.status(403).json({ error: '免费用户每天限1次塔罗占卜，开通VIP解锁无限次' });
-      }
-    }
-  }
+  const gate = consumeDivinationQuota(req, res, 'tarot');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const cards = engine.drawTarotCards(spread, question);
 
   // Try AI interpretation
@@ -425,7 +646,7 @@ app.post('/api/tarot/draw', aiLimiter, auth, async (req, res) => {
   if (req.user) {
     try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(uuidv4(), req.user.id, 'tarot', question || '', JSON.stringify(cards)); } catch(e) {}
   }
-  res.json({ cards, question, reading: aiText || null, timestamp: new Date().toISOString() });
+  res.json(withUsage({ cards, question, reading: aiText || null, timestamp: new Date().toISOString() }, gate));
 });
 
 // ========== ZODIAC ==========
@@ -463,11 +684,13 @@ app.get('/api/zodiac/:sign', (req, res) => {
   res.json({ ...data, ...fortune, reading: fortune.overall, luckyDirection: '东方', fortune });
 });
 
-app.post('/api/zodiac/daily', aiLimiter, (req, res) => {
+app.post('/api/zodiac/daily', aiLimiter, auth, (req, res) => {
   const { month, day } = req.body;
+  const gate = consumeDivinationQuota(req, res, 'zodiac-daily');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const sign = engine.getZodiac(month, day);
   const fortune = engine.generateDailyFortune(sign);
-  res.json({ sign, ...engine.zodiacData[sign], ...fortune, reading: fortune.overall, luckyDirection: '东方', fortune });
+  res.json(withUsage({ sign, ...engine.zodiacData[sign], ...fortune, reading: fortune.overall, luckyDirection: '东方', fortune }, gate));
 });
 
 // ========== EIGHT CHARACTERS ==========
@@ -475,6 +698,8 @@ app.post('/api/eight-characters', aiLimiter, auth, async (req, res) => {
   try {
   const { year, month, day, hour } = req.body;
   if (!year || !month || !day) return res.status(400).json({ error: '请提供出生年月日时' });
+  const gate = consumeDivinationQuota(req, res, 'eight-char');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
 
   let result = engine.getEightCharacters(year, month, day, hour || 12);
 
@@ -504,7 +729,7 @@ app.post('/api/eight-characters', aiLimiter, auth, async (req, res) => {
   if (req.user) {
     try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(uuidv4(), req.user.id, 'eight-char', `${year}-${month}-${day}`, JSON.stringify(result)); } catch(e) {}
   }
-  res.json(result);
+  res.json(withUsage(result, gate));
   } catch (err) { console.error('Eight-char error:', err); res.status(500).json({ error: '分析失败，请稍后重试' }); }
 });
 
@@ -512,6 +737,8 @@ app.post('/api/eight-characters', aiLimiter, auth, async (req, res) => {
 app.post('/api/iching', aiLimiter, auth, async (req, res) => {
   try {
   const { question } = req.body;
+  const gate = consumeDivinationQuota(req, res, 'iching');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const hex = engine.generateHexagram();
 
   // Fetch user profile for personalized reading
@@ -539,7 +766,7 @@ app.post('/api/iching', aiLimiter, auth, async (req, res) => {
   if (req.user) {
     try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(uuidv4(), req.user.id, 'iching', question || '', JSON.stringify(hex)); } catch(e) {}
   }
-  res.json({ ...hex, hexagram: hex.name, question, timestamp: new Date().toISOString() });
+  res.json(withUsage({ ...hex, hexagram: hex.name, question, timestamp: new Date().toISOString() }, gate));
   } catch (err) { console.error('IChing error:', err.message); res.status(500).json({ error: '占卜失败，请稍后重试' }); }
 });
 
@@ -548,6 +775,8 @@ app.post('/api/name', aiLimiter, auth, async (req, res) => {
   try {
   const { name, partnerName } = req.body;
   if (!name) return res.status(400).json({ error: '请输入姓名' });
+  const gate = consumeDivinationQuota(req, res, 'name');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   let r = engine.nameAnalysis(name);
 
   if (partnerName) {
@@ -567,7 +796,7 @@ app.post('/api/name', aiLimiter, auth, async (req, res) => {
   if (req.user) {
     try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(uuidv4(), req.user.id, 'name', name + (partnerName ? '&'+partnerName : ''), JSON.stringify(r)); } catch(e) {}
   }
-  res.json(r);
+  res.json(withUsage(r, gate));
   } catch (err) { console.error('Name error:', err.message); res.status(500).json({ error: '分析失败，请稍后重试' }); }
 });
 
@@ -575,6 +804,8 @@ app.post('/api/name', aiLimiter, auth, async (req, res) => {
 app.post('/api/sign/draw', aiLimiter, auth, async (req, res) => {
   try {
   const { type = 'guanyin' } = req.body;
+  const gate = consumeDivinationQuota(req, res, 'sign');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const s = engine.signs[Math.floor(Math.random() * engine.signs.length)];
 
   const aiText = await engine.callAI(
@@ -588,15 +819,17 @@ app.post('/api/sign/draw', aiLimiter, auth, async (req, res) => {
   if (req.user) {
     try { db.prepare('INSERT INTO records (id, user_id, type, question, result) VALUES (?,?,?,?,?)').run(uuidv4(), req.user.id, 'sign', type, JSON.stringify(s)); } catch(e) {}
   }
-  res.json({ ...s, type, timestamp: new Date().toISOString() });
+  res.json(withUsage({ ...s, type, timestamp: new Date().toISOString() }, gate));
   } catch (err) { console.error('Sign draw error:', err.message); res.status(500).json({ error: '抽签失败，请稍后重试' }); }
 });
 
 // ========== DREAM ==========
-app.post('/api/dream', aiLimiter, async (req, res) => {
+app.post('/api/dream', aiLimiter, auth, async (req, res) => {
   try {
   const { keyword } = req.body;
   if (!keyword) return res.status(400).json({ error: '请输入梦境关键词' });
+  const gate = consumeDivinationQuota(req, res, 'dream');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
 
   let result = { keyword, ...engine.interpretDream(keyword) };
 
@@ -608,13 +841,16 @@ app.post('/api/dream', aiLimiter, async (req, res) => {
 
   if (aiText) { result.aiAnalysis = aiText; result.reading = aiText; }
 
-  res.json({ ...result, timestamp: new Date().toISOString() });
+  res.json(withUsage({ ...result, timestamp: new Date().toISOString() }, gate));
   } catch (err) { console.error('Dream error:', err.message); res.status(500).json({ error: '解梦失败，请稍后重试' }); }
 });
 
 // ========== DAILY FORTUNE ==========
-app.post('/api/daily-fortune', aiLimiter, async (req, res) => {
+app.post('/api/daily-fortune', aiLimiter, auth, async (req, res) => {
   const { month, day } = req.body;
+  if (!month || !day) return res.status(400).json({ error: '请输入生日月份和日期' });
+  const gate = consumeDivinationQuota(req, res, 'daily-fortune');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const sign = engine.getZodiac(month, day);
   let result = { zodiac: sign, zodiacEmoji: engine.zodiacData[sign]?.emoji || '⭐', ...engine.generateDailyFortune(sign) };
 
@@ -637,7 +873,7 @@ app.post('/api/daily-fortune', aiLimiter, async (req, res) => {
     }
   }
 
-  res.json(result);
+  res.json(withUsage(result, gate));
 });
 
 const zodiacAnimals = [
@@ -745,6 +981,8 @@ app.post('/api/zodiac-animal', auth, aiLimiter, async (req, res) => {
   const selected = cleanString(req.body.animal, 40);
   const profile = animalByYear(req.body.year) || zodiacAnimals.find(item => item.key === selected || item.name === selected);
   if (!profile) return res.status(400).json({ error: '请提供有效年份或生肖' });
+  const gate = consumeDivinationQuota(req, res, 'zodiac-animal');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const highlights = [
     { label: '生肖五行', value: profile.element },
     { label: '优势能量', value: profile.strengths[0] },
@@ -758,13 +996,15 @@ app.post('/api/zodiac-animal', auth, aiLimiter, async (req, res) => {
   );
   const result = { animal: profile.name, key: profile.key, summary: `生肖${profile.name}近期适合围绕“${profile.strengths[0]}”发挥优势。`, highlights, reading: aiText || fallback, timestamp: nowIso() };
   saveRecordSafe(req.user?.id, 'zodiac-animal', profile.name, result);
-  res.json(result);
+  res.json(withUsage(result, gate));
 });
 
 app.post('/api/relationship', auth, aiLimiter, async (req, res) => {
   const scenario = cleanString(req.body.scenario, 40) || 'single';
   const question = cleanString(req.body.question, 800);
   if (!question) return res.status(400).json({ error: '请填写情感问题' });
+  const gate = consumeDivinationQuota(req, res, 'relationship');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const fallback = getFallbackRelationship(scenario, question);
   const aiText = await engine.callAI(
     '你是一个情感占卜与关系复盘顾问。输出必须温和、克制、非绝对化，不能制造焦虑，遇到暴力、自伤等高风险内容要建议寻求专业帮助。',
@@ -773,7 +1013,7 @@ app.post('/api/relationship', auth, aiLimiter, async (req, res) => {
   );
   const result = { ...fallback, reading: aiText || fallback.reading, timestamp: nowIso() };
   saveRecordSafe(req.user?.id, 'relationship', question, result);
-  res.json(result);
+  res.json(withUsage(result, gate));
 });
 
 app.post('/api/career-wealth', auth, aiLimiter, async (req, res) => {
@@ -781,6 +1021,8 @@ app.post('/api/career-wealth', auth, aiLimiter, async (req, res) => {
   const profile = cleanString(req.body.profile, 200);
   const question = cleanString(req.body.question, 800);
   if (!question) return res.status(400).json({ error: '请填写事业或财务问题' });
+  const gate = consumeDivinationQuota(req, res, 'career-wealth');
+  if (!gate.ok) return sendQuotaBlocked(res, gate);
   const fallback = getFallbackCareer(focus, question);
   const aiText = await engine.callAI(
     '你是一个事业财运分析顾问。输出必须定位为娱乐参考和个人成长建议，不提供股票、博彩、借贷、投资买卖指令。',
@@ -789,7 +1031,7 @@ app.post('/api/career-wealth', auth, aiLimiter, async (req, res) => {
   );
   const result = { ...fallback, reading: aiText || fallback.reading, timestamp: nowIso() };
   saveRecordSafe(req.user?.id, 'career-wealth', question, result);
-  res.json(result);
+  res.json(withUsage(result, gate));
 });
 
 app.post('/api/feedback', auth, (req, res) => {
@@ -947,10 +1189,10 @@ app.post('/api/user/first-divination', auth, (req, res) => {
 
 app.get('/api/records', auth, (req, res) => {
   if (!req.user) return res.status(401).json({ error: '请先登录' });
-  const userInfo = db.prepare('SELECT is_vip FROM users WHERE id = ?').get(req.user.id);
-  const limit = (userInfo && userInfo.is_vip) ? 999 : 5;
+  const userInfo = db.prepare('SELECT is_vip, vip_expire FROM users WHERE id = ?').get(req.user.id);
+  const limit = isActiveVip(userInfo) ? 999 : 5;
   const records = db.prepare('SELECT * FROM records WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(req.user.id, limit);
-  res.json({ records, isVip: !!(userInfo && userInfo.is_vip), limit });
+  res.json({ records, isVip: isActiveVip(userInfo), limit });
 });
 
 app.post('/api/records', auth, (req, res) => {
@@ -977,6 +1219,7 @@ const productCatalog = {
   vip_month: { name: 'VIP月卡', amount: 29.9 },
   vip_quarter: { name: 'VIP季卡', amount: 69.9 },
   vip_year: { name: 'VIP年卡', amount: 199 },
+  single_report: SINGLE_REPORT_PRODUCT,
 };
 
 Object.assign(productCatalog, {
@@ -987,6 +1230,7 @@ Object.assign(productCatalog, {
 });
 
 const reportCatalog = [
+  { product: 'single_report', category: '单次测算', name: SINGLE_REPORT_PRODUCT.name, desc: '免费次数用完后可单独购买一次完整 AI 占卜测试报告；会员用户不限次免费。', amount: SINGLE_REPORT_PRODUCT.amount, original: 9.9, badge: '低门槛', sections: ['解锁 1 次综合测算', '包含 AI 深度解读', '可用于塔罗/八字/情感/事业等测试', '会员永久免费不限次'] },
   { product: 'report_love', category: '情感关系', name: '情感关系深度报告', desc: '适合暧昧、复合、稳定关系和关系选择场景，包含需求拆解、沟通建议和行动清单。', amount: productCatalog.report_love.amount, original: 39.9, badge: '高转化', sections: ['关系能量摘要', '真实需求分析', '沟通行动清单', '7天复盘建议'] },
   { product: 'report_career', category: '事业财运', name: '事业财运行动报告', desc: '围绕职业节奏、机会窗口、财务习惯和风险提醒，给出更清晰的执行路径。', amount: productCatalog.report_career.amount, original: 59.9, badge: '推荐', sections: ['职业节奏判断', '机会与风险', '财务习惯建议', '30天行动计划'] },
   { product: 'report_year', category: '年度运势', name: '年度综合运势报告', desc: '覆盖年度主题、情感、事业、财运、个人成长和关键月份提醒。', amount: productCatalog.report_year.amount, original: 99.9, badge: '年度礼遇', sections: ['年度关键词', '四大维度运势', '关键月份提醒', '个人成长建议'] },

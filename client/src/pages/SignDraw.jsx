@@ -5,6 +5,8 @@ import { AuthContext } from '../App'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload, readApiJson } from '../utils/api'
 
 const signTypes = [
   { value: 'guanyin', icon: '🙏' },
@@ -23,21 +25,28 @@ export default function SignDraw() {
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const typeNames = t('types', { returnObjects: true })
   const tryQuestions = t('tryQuestions', { returnObjects: true })
 
   const doDraw = async () => {
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/sign/draw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ type, question: question || undefined, lang })
       })
-      const data = await res.json()
+      const data = await readApiJson(res)
       setResult(data)
-    } catch (e) {}
+    } catch (err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || tc.t('common.error'))
+    }
     setLoading(false)
   }
 
@@ -76,6 +85,7 @@ export default function SignDraw() {
               {t('startDraw')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto space-y-6">

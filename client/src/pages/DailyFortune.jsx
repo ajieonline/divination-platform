@@ -5,6 +5,8 @@ import { AuthContext } from '../App'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { getPaywallPayload, readApiJson } from '../utils/api'
 
 const monthIcons = ['❄️','❄️','🌸','🌸','🌿','☀️','☀️','🌺','🍂','🍂','❄️','❄️']
 const luckScoreMap = { '大吉': 5, '吉': 4, '中吉': 4, '小吉': 3, '平': 3 }
@@ -21,13 +23,14 @@ const getText = (value) => typeof value === 'string' && Number.isNaN(Number(valu
 
 export default function DailyFortune() {
   const { t, i18n } = useTranslation('daily')
-  const { token } = useContext(AuthContext)
+  const { user, token } = useContext(AuthContext)
   const lang = i18n.language?.startsWith('en') ? 'en' : 'zh'
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [day, setDay] = useState(now.getDate())
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+  const [paywall, setPaywall] = useState(null)
 
   const months = Array.from({ length: 12 }, (_, i) => i + 1)
   const days = Array.from({ length: 31 }, (_, i) => i + 1)
@@ -35,15 +38,21 @@ export default function DailyFortune() {
   const doFortune = async () => {
     if (!month || !day) { alert(t('error')); return }
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/daily-fortune', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ month, day, lang })
       })
-      const data = await res.json()
+      const data = await readApiJson(res)
       setResult(data)
-    } catch (e) {}
+    } catch (err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || t('error'))
+    }
     setLoading(false)
   }
 
@@ -77,6 +86,7 @@ export default function DailyFortune() {
             {t('startView')}
           </button>
         )}
+        <PaywallNotice payload={paywall} user={user} token={token} />
       </div>
 
       {result && !loading && (

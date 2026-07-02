@@ -1,10 +1,13 @@
-import React, { useState } from 'react'
+import React, { useContext, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import SaveButton from '../components/SaveButton'
 import { motion, AnimatePresence } from 'framer-motion'
 import Dropdown from '../components/Dropdown'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
+import PaywallNotice from '../components/PaywallNotice'
+import { AuthContext } from '../App'
+import { authHeaders, getPaywallPayload, readApiJson } from '../utils/api'
 
 const quickNames = {
   zh: ['李明', '王芳', '张伟', '刘洋', '陈静', '赵磊', '周杰', '吴娜'],
@@ -14,25 +17,33 @@ const quickNames = {
 export default function NameTest() {
   const { t, i18n } = useTranslation('name')
   const tc = useTranslation('common')
+  const { user, token } = useContext(AuthContext)
   const lang = i18n.language?.startsWith('en') ? 'en' : 'zh'
   const [mode, setMode] = useState('single')
   const [name, setName] = useState('')
   const [partnerName, setPartnerName] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [paywall, setPaywall] = useState(null)
 
   const analyze = async () => {
     if (!name.trim()) { alert(lang === 'en' ? 'Please enter a name' : '请输入姓名'); return }
     if (mode === 'partner' && !partnerName.trim()) { alert(lang === 'en' ? 'Please enter partner name' : '请输入对方姓名'); return }
     setLoading(true)
+    setResult(null)
+    setPaywall(null)
     try {
       const res = await fetch('/api/name', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(token),
         body: JSON.stringify({ name: name.trim(), partnerName: mode === 'partner' ? partnerName.trim() : undefined, lang })
       })
-      setResult(await res.json())
-    } catch(e) { console.error(e) }
+      setResult(await readApiJson(res))
+    } catch(err) {
+      const quota = getPaywallPayload(err)
+      if (quota) setPaywall(quota)
+      else alert(err.message || tc.t('common.error'))
+    }
     setLoading(false)
   }
 
@@ -111,6 +122,7 @@ export default function NameTest() {
               📝 {t('startBtn')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} className="mt-4" />
         </div>
 
         <AnimatePresence>

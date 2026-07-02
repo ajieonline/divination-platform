@@ -6,6 +6,8 @@ import { AuthContext } from '../App'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MarkdownText from '../components/MarkdownText'
 import SaveButton from '../components/SaveButton'
+import PaywallNotice from '../components/PaywallNotice'
+import { authHeaders, getPaywallPayload, readApiJson } from '../utils/api'
 
 const spreads = [
   { value: 'single', icon: '🃏', cards: 1 },
@@ -32,6 +34,7 @@ export default function Tarot() {
   const [revealedCards, setRevealedCards] = useState([])
   const [currentReveal, setCurrentReveal] = useState(-1)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [paywall, setPaywall] = useState(null)
   const abortRef = useRef(null)  // 防重入锁
   const requestIdRef = useRef(0) // 请求ID，确保只有最新请求的结果生效
   const timersRef = useRef([])   // 清理动画定时器
@@ -48,7 +51,6 @@ export default function Tarot() {
   }
 
   const doDivination = async () => {
-    if (!user) { alert(tc.t('common.loginRequired')); return }
     // 防重入：如果已经在请求中，直接返回
     if (abortRef.current) return
     abortRef.current = true
@@ -56,6 +58,7 @@ export default function Tarot() {
     const currentRequestId = ++requestIdRef.current
     setLoading(true)
     setResult(null)
+    setPaywall(null)
     clearAllTimers()
     setRevealedCards([])
     setCurrentReveal(-1)
@@ -63,18 +66,19 @@ export default function Tarot() {
     try {
       const res = await fetch('/api/tarot/draw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
         body: JSON.stringify({ spread, question: question || undefined, lang })
       })
-      const data = await res.json()
+      const data = await readApiJson(res)
       // 检查是否是最新请求，如果不是则丢弃结果
       if (currentRequestId !== requestIdRef.current) return
-      if (!res.ok) { alert(data.error || t('error')); setLoading(false); abortRef.current = false; return }
       setResult(data)
       startCardReveal(data.cards || [])
-    } catch (e) {
+    } catch (err) {
       if (currentRequestId === requestIdRef.current) {
-        alert(tc.t('common.error'))
+        const quota = getPaywallPayload(err)
+        if (quota) setPaywall(quota)
+        else alert(err.message || tc.t('common.error'))
       }
     }
     setLoading(false)
@@ -167,6 +171,7 @@ export default function Tarot() {
               {t('startDraw')}
             </button>
           )}
+          <PaywallNotice payload={paywall} user={user} token={token} />
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
